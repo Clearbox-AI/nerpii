@@ -1,1 +1,1 @@
-# clearbox-ner
+# clearbox-named entity recognition
