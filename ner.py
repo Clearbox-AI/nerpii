@@ -46,7 +46,7 @@ def ner(df_input_path): #df_input_path: string containing path of csv file
         #assigning ZIPCODE entity if zipcode in dataset is 'object' type
         elif (('postal' in col.lower()) and ('code' in col.lower())) or (('zip' in col.lower()) and (
                 'code' in col.lower())) or (('zip' in col.lower())): 
-            list_entities[col] = ['ZIPCODE', len([i for i in l[col]])/df.shape[0]]
+            list_entities[col] = ['ZIPCODE', len([i for i in l[col]])/df_input.shape[0]]
         else:
             most_freq = max(set(lst), key=lst.count)
             list_entities[col] = [most_freq, len([i for i in lst if i == most_freq])/df_input.shape[0]]
