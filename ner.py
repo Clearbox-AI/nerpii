@@ -44,7 +44,7 @@ def ner(df_input_path): #df_input_path: string containing path of csv file
     loc_cols = [i[0] for i in loc_cols if i[1] == 'LOCATION']
 
         
-    addresses = ['street', 'rue', 'via', 'square', 'avenue', 'place', 'strada']
+    addresses = ['street', 'rue', 'via', 'square', 'avenue', 'place', 'strada', 'st', 'lane', 'road', 'boulevard', 'nln']
     for col in loc_cols:
         list_addresses = [i for i in df_input[col].fillna('none') if any(ele in i.lower() for ele in addresses)]
         if len(list_addresses) > 0.1 * int(df_input.shape[0]):
