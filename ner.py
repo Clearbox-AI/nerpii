@@ -1,19 +1,20 @@
-
 from presidio_analyzer import AnalyzerEngine, BatchAnalyzerEngine, RecognizerRegistry, PatternRecognizer
 import pandas as pd
 
 
 def ner(df_input_path): #df_input_path: string containing path of csv file
+    print('Starting...')
 
     df_input = pd.read_csv(df_input_path)
     df_input = df_input.sample(n=min(1000, df_input.shape[0]))
 
-    #add some lists with rules to identity customed entity
+    #add some lists with rules to identify customed entity
     addresses = ['Street', 'Rue', 'Via', 'Square', 'Avenue', 'Place', 'Strada', 'St', 'Lane', 
     'Road', 'Boulevard', 'Ln', "Rd", "Highway" "Drive", "Av", "Hwy", "Blvd"]
     addresses_recognizer = PatternRecognizer(supported_entity="ADDRESS", deny_list=addresses)
 
-    analyzer = AnalyzerEngine(supported_languages=["en", "fr"])
+
+    analyzer = AnalyzerEngine(supported_languages=["en", "fr", "it", "es"])
     analyzer.registry.add_recognizer(addresses_recognizer)
     batch_analyzer = BatchAnalyzerEngine(analyzer_engine=analyzer)
 
@@ -44,11 +45,12 @@ def ner(df_input_path): #df_input_path: string containing path of csv file
                 len([i for i in l[col] if i == 'LOCATION']) > 0.1 * df_input.shape[0]):
             list_entities[col] = ['LOCATION', len([i for i in l[col] if i == 'LOCATION'])/df_input.shape[0]]
         #assigning ZIPCODE entity if zipcode in dataset is 'object' type
-        elif (('postal' in col.lower()) and ('code' in col.lower())) or (('zip' in col.lower()) and (
-                'code' in col.lower())) or (('zip' in col.lower())): 
-            list_entities[col] = ['ZIPCODE', len([i for i in l[col]])/df.shape[0]]
+        elif (('postal' in col.lower()) and ('code' in col.lower())) or (('zip' in col.lower()) and ('code' in col.lower())) or (('zip' in col.lower())): 
+            list_entities[col] = ['ZIPCODE', len([i for i in l[col]])/df_input.shape[0]]
+        
         else:
             most_freq = max(set(lst), key=lst.count)
             list_entities[col] = [most_freq, len([i for i in lst if i == most_freq])/df_input.shape[0]]
+
     
     return list_entities
