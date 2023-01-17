@@ -2,15 +2,19 @@ from presidio_analyzer import AnalyzerEngine, BatchAnalyzerEngine, RecognizerReg
 import pandas as pd
 
 
+
+
 def ner(df_input_path): #df_input_path: string containing path of csv file
     print('Starting...')
 
     df_input = pd.read_csv(df_input_path)
     df_input = df_input.sample(n=min(1000, df_input.shape[0]))
+    df_input = df_input.fillna(0)
 
     #add some lists with rules to identify customed entity
     addresses = ['Street', 'Rue', 'Via', 'Square', 'Avenue', 'Place', 'Strada', 'St', 'Lane', 
-    'Road', 'Boulevard', 'Ln', "Rd", "Highway" "Drive", "Av", "Hwy", "Blvd"]
+    'Road', 'Boulevard', 'Ln', "Rd", "Highway" "Drive", "Av", "Hwy", "Blvd", "Corso", "Piazza", 
+    "Calle", "Plaza", "Avenida", "Rambla", "C/"]
     addresses_recognizer = PatternRecognizer(supported_entity="ADDRESS", deny_list=addresses)
 
 

@@ -1,2 +1,5 @@
 presidio-analyzer
 pandas
+spacy
+spacy-transformers
+model: en_core_web_trf
