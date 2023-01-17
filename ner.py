@@ -2,8 +2,6 @@ from presidio_analyzer import AnalyzerEngine, BatchAnalyzerEngine, RecognizerReg
 import pandas as pd
 
 
-
-
 def ner(df_input_path): #df_input_path: string containing path of csv file
     print('Starting...')
 
@@ -51,7 +49,10 @@ def ner(df_input_path): #df_input_path: string containing path of csv file
         #assigning ZIPCODE entity if zipcode in dataset is 'object' type
         elif (('postal' in col.lower()) and ('code' in col.lower())) or (('zip' in col.lower()) and (
                 'code' in col.lower())) or (('zip' in col.lower())): 
-            list_entities[col] = ['ZIPCODE', len([i for i in l[col]])/df_input.shape[0]]
+            list_entities[col] = ['ZIPCODE', 1.0]
+        #assigning CREDIT_CARD_NUMBER entity if credit card number in dataset is 'object' type
+        elif ((('credit' in col.lower()) or ('card' in col.lower())) and ('number' in col.lower())):
+            list_entities[col] = ['CREDIT_CARD_NUMBER', 1.0]
         else:
             most_freq = max(set(lst), key=lst.count)
             list_entities[col] = [most_freq, len([i for i in lst if i == most_freq])/df_input.shape[0]]
