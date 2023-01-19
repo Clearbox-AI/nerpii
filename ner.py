@@ -72,8 +72,7 @@ def ner(df_input_path): #df_input_path: string containing path of csv file
 
     # tryin to assign the ORGANIZATION entity to keys/columns 
     # in dict_global_entities with None value
-
-    print('Everything is good')  
+ 
 
     tokenizer = AutoTokenizer.from_pretrained("dslim/bert-base-NER")
     model = AutoModelForTokenClassification.from_pretrained("dslim/bert-base-NER")
@@ -95,8 +94,6 @@ def ner(df_input_path): #df_input_path: string containing path of csv file
 
     for i in keyColumns_valueNone.keys():
         keyColumns_valueNone[i] = nlp_model(keyColumns_valueNone[i])
-
-    print('Still good')  
     
     keyColumns_valueEntities = {}
 
