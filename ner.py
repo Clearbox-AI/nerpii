@@ -1,5 +1,7 @@
 from presidio_analyzer import AnalyzerEngine, BatchAnalyzerEngine, RecognizerRegistry, PatternRecognizer
 import pandas as pd
+from transformers import AutoTokenizer, AutoModelForTokenClassification
+from transformers import pipeline
 
 
 def ner(df_input_path): #df_input_path: string containing path of csv file
@@ -7,7 +9,7 @@ def ner(df_input_path): #df_input_path: string containing path of csv file
 
     df_input = pd.read_csv(df_input_path)
     df_input = df_input.sample(n=min(1000, df_input.shape[0]))
-    df_input = df_input.fillna(0)
+    df_input = df_input.fillna('/')
 
     #add some lists with rules to identify customed entity
     addresses = ['Street', 'Rue', 'Via', 'Square', 'Avenue', 'Place', 'Strada', 'St', 'Lane', 
@@ -68,5 +70,53 @@ def ner(df_input_path): #df_input_path: string containing path of csv file
             most_freq = max(set(lst), key=lst.count)
             dict_global_entities[col] = [most_freq, len([i for i in lst if i == most_freq])/df_input.shape[0]]
 
+    # tryin to assign the ORGANIZATION entity to keys/columns 
+    # in dict_global_entities with None value
+
+    print('Everything is good')  
+
+    tokenizer = AutoTokenizer.from_pretrained("dslim/bert-base-NER")
+    model = AutoModelForTokenClassification.from_pretrained("dslim/bert-base-NER")
+
+    nlp_model = pipeline("ner", model=model, tokenizer=tokenizer)
+
+    # the following for loop returns a dict where keys are columns 
+    # with no assigned entity and values are a list of the records of 
+    # that column in dataset
+
+    keyColumns_valueNone = {}
+
+    for i in df_input.columns:
+        if df_input[i].dtype == 'object' and dict_global_entities[i] == None:
+            for j in range (0, df_input.shape[0]):
+                keyColumns_valueNone[i]= [w for w in df_input[i]] 
+    
+    # applying nlp_model to recognize entities
+
+    for i in keyColumns_valueNone.keys():
+        keyColumns_valueNone[i] = nlp_model(keyColumns_valueNone[i])
+
+    print('Still good')  
+    
+    keyColumns_valueEntities = {}
+
+    for i in keyColumns_valueNone.keys():
+        #print(i, dict_of_entities[i])
+        lst_of_entities_for_keys = []
+        for j in range(0, len(keyColumns_valueNone[i])):
+            if len(keyColumns_valueNone[i][j]) > 0:
+                #print(i, dict_of_entities[i][j])
+                for w in range(0, len(keyColumns_valueNone[i][j])):
+                    lst_of_entities_for_keys.append(keyColumns_valueNone[i][j][w]['entity'])
+                    keyColumns_valueEntities[i] = lst_of_entities_for_keys
+    
+    key_columns = [key for key in keyColumns_valueEntities.keys()]
+    for col in key_columns:
+        lista = [i for i in keyColumns_valueEntities[col]]
+        if (('B-ORG' in lista)) and (
+            len([i for i in keyColumns_valueEntities[col] if ((i == 'B-ORG'))]) > 0.1 * df_input.shape[0]):
+            dict_global_entities[col] = ['ORGANIZATION', len([i for i in keyColumns_valueEntities[col] 
+                    if (i == 'B-ORG')])/df_input.shape[0]]
+                
     
     return dict_global_entities
