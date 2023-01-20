@@ -9,7 +9,12 @@ def ner(df_input_path): #df_input_path: string containing path of csv file
 
     df_input = pd.read_csv(df_input_path)
     df_input = df_input.sample(n=min(1000, df_input.shape[0]))
-    df_input = df_input.fillna('/')
+
+    # this for loop fillna in object column with zero
+
+    for i in df_input.columns:
+        if df_input[i].dtype == 'object':
+            df_input[i] = df_input[i].fillna(0)
 
     #add some lists with rules to identify customed entity
     addresses = ['Street', 'Rue', 'Via', 'Square', 'Avenue', 'Place', 'Strada', 'St', 'Lane', 
@@ -78,6 +83,12 @@ def ner(df_input_path): #df_input_path: string containing path of csv file
     model = AutoModelForTokenClassification.from_pretrained("dslim/bert-base-NER")
 
     nlp_model = pipeline("ner", model=model, tokenizer=tokenizer)
+
+    # this for loop change 0 value in object column in '/' value to be processed by the nlp model
+
+    for i in df_input.columns:
+        if df_input[i].dtype == 'object':
+            df_input[i].replace(to_replace = 0, value = '/', inplace =True)
 
     # the following for loop returns a dict where keys are columns 
     # with no assigned entity and values are a list of the records of 
