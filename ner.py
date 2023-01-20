@@ -8,7 +8,7 @@ def ner(df_input_path): #df_input_path: string containing path of csv file
     print('Starting...')
 
     df_input = pd.read_csv(df_input_path)
-    df_input = df_input.sample(n=min(1000, df_input.shape[0]))
+    df_input = df_input.sample(n=min(500, df_input.shape[0]))
 
     # this for loop fillna in object column with zero
 
@@ -53,7 +53,7 @@ def ner(df_input_path): #df_input_path: string containing path of csv file
         if df_input[w].dtype == 'object':
             dict_typeObject_entities[w] = [i[0].entity_type for i in j.recognizer_results if len(i) > 0]
         
-    cols = [col for col in dict_typeObject_entities.keys() if len(dict_typeObject_entities[col]) > 0.1 * df_input.shape[0]]
+    cols = [col for col in dict_typeObject_entities.keys() if len(dict_typeObject_entities[col]) > 0.3 * df_input.shape[0]]
     
     # this is a very heuristic loop that assigns each object column with an entity
   
