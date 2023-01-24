@@ -1,20 +1,45 @@
+from typing import Dict, List, Optional
+
 from presidio_analyzer import AnalyzerEngine, BatchAnalyzerEngine, RecognizerRegistry, PatternRecognizer
 import pandas as pd
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 from transformers import pipeline
 
 
-def ner(df_input_path): #df_input_path: string containing path of csv file
+def ner(df_input_path: pd.DataFrame, data_sample: int = 500) -> Dict:
+    """This function takes as input a dataframe and try to assign to each object column an entity.
+    It returns a dictionary with columns' names as keys and a list as values.
+
+    The list contains the entity associated to the column and a confidence score.
+    The confidence score is the probability that a column is associated with the correct entity. 
+
+    Parameters
+    ----------
+    df_input_path : pd.DataFrame
+        It is a dataset
+    data_sample : int, optional
+        It is a sample of the previous dataset, by default 500. 
+        The fuction takes a sample of the original datset to reduce computational costs.
+
+    Returns
+    -------
+    Dict
+        It returns a dictionary with columns' names as keys and a list as values.
+
+    The list contains the entity associated to the column and a confidence score.
+    The confidence score is the probability that a column is associated with the correct entity. 
+    """
+    #df_input_path: string containing path of csv file
     print('Starting...')
 
     df_input = pd.read_csv(df_input_path)
-    df_input = df_input.sample(n=min(500, df_input.shape[0]))
+    df_input = df_input.sample(n=min(data_sample, df_input.shape[0]))
 
     # this for loop fillna in object column with zero
 
-    for i in df_input.columns:
-        if df_input[i].dtype == 'object':
-            df_input[i] = df_input[i].fillna(0)
+    for col in df_input.columns:
+        if df_input[col].dtype == 'object':
+            df_input[col] = df_input[col].fillna(0)
 
     #add some lists with rules to identify customed entity
     addresses = ['Street', 'Rue', 'Via', 'Square', 'Avenue', 'Place', 'Strada', 'St', 'Lane', 
@@ -33,49 +58,48 @@ def ner(df_input_path): #df_input_path: string containing path of csv file
 
     # dict_entities is a dictionary where the columns' names are the keys and the entity and the confidence are the values
     dict_global_entities = {}
-    listOf_df_cols = [col for col in df_input.columns]
+    list_of_df_cols = list(df_input.columns)
 
-    for col in listOf_df_cols:
-        dict_global_entities[col] = None
-    
-    for col in listOf_df_cols:
+    for col in list_of_df_cols:
     #assigning ZIPCODE entity
-        if (('postal' in col.lower()) and ('code' in col.lower())) or (('zip' in col.lower()) and (
-            'code' in col.lower())) or (('zip' in col.lower())):
+        col_lower = col.lower()
+        if (('postal' in col_lower) and ('code' in col_lower)) or ('zip' in col_lower):
             dict_global_entities[col] = ['ZIPCODE', 1.0]
     #assigning CREDIT_CARD_NUMBER entity
-        elif (('credit' in col.lower()) or ('card' in col.lower())) and ('number' in col.lower()):
+        elif (('credit' in col_lower) or ('card' in col_lower)) and ('number' in col_lower):
             dict_global_entities[col] = ['CREDIT_CARD_NUMBER', 1.0]
+        else:
+            dict_global_entities[col] = None
     
     # the following part creates a python dictionary (keys-> column names, values-> entity type) for columns of type object
-    dict_typeObject_entities = {}
-    for w, j in zip(df_input.columns, analyzer_results):
-        if df_input[w].dtype == 'object':
-            dict_typeObject_entities[w] = [i[0].entity_type for i in j.recognizer_results if len(i) > 0]
+    dict_type_object_entities = {}
+    for col, res in zip(df_input.columns, analyzer_results):
+        if df_input[col].dtype == 'object':
+            dict_type_object_entities[col] = [single_value_type[0].entity_type for single_value_type in res.recognizer_results if len(single_value_type) > 0]
         
-    cols = [col for col in dict_typeObject_entities.keys() if len(dict_typeObject_entities[col]) > 0.3 * df_input.shape[0]]
+    cols = [col for col in dict_type_object_entities.keys() if len(dict_type_object_entities[col]) > 0.3 * df_input.shape[0]]
     
     # this is a very heuristic loop that assigns each object column with an entity
   
     for col in cols:
-        lst = [i for i in dict_typeObject_entities[col]]
+        list_object_entities = dict_type_object_entities[col]
+        col_lower = col.lower()
         #assigning LOCATION entity
-        if ('LOCATION' in lst) and ('name' not in col.lower()) and (
-                len([i for i in dict_typeObject_entities[col] if i == 'LOCATION']) > 0.1 * df_input.shape[0]):
-            dict_global_entities[col] = ['LOCATION', len([i for i in dict_typeObject_entities[col] 
+        if ('LOCATION' in list_object_entities) and ('name' not in col_lower) and (
+                len([i for i in dict_type_object_entities[col] if i == 'LOCATION']) > 0.1 * df_input.shape[0]):
+            dict_global_entities[col] = ['LOCATION', len([i for i in dict_type_object_entities[col] 
             if i == 'LOCATION'])/df_input.shape[0]]
         #assigning ZIPCODE entity if zipcode in dataset is 'object' type
-        elif (('postal' in col.lower()) and ('code' in col.lower())) or (('zip' in col.lower()) and (
-                'code' in col.lower())) or (('zip' in col.lower())): 
+        elif (('postal' in col_lower) and ('code' in col_lower)) or ('zip' in col_lower): 
             dict_global_entities[col] = ['ZIPCODE', 1.0]
         #assigning CREDIT_CARD_NUMBER entity if credit card number in dataset is 'object' type
-        elif ((('credit' in col.lower()) or ('card' in col.lower())) and ('number' in col.lower())):
+        elif ((('credit' in col_lower) or ('card' in col_lower)) and ('number' in col_lower)):
             dict_global_entities[col] = ['CREDIT_CARD_NUMBER', 1.0]
         else:
-            most_freq = max(set(lst), key=lst.count)
-            dict_global_entities[col] = [most_freq, len([i for i in lst if i == most_freq])/df_input.shape[0]]
+            most_freq = max(set(list_object_entities), key=list_object_entities.count)
+            dict_global_entities[col] = [most_freq, len([i for i in list_object_entities if i == most_freq])/df_input.shape[0]]
 
-    # tryin to assign the ORGANIZATION entity to keys/columns 
+    # trying to assign the ORGANIZATION entity to keys/columns 
     # in dict_global_entities with None value
  
 
@@ -86,9 +110,9 @@ def ner(df_input_path): #df_input_path: string containing path of csv file
 
     # this for loop change 0 value in object column in '/' value to be processed by the nlp model
 
-    for i in df_input.columns:
-        if df_input[i].dtype == 'object':
-            df_input[i].replace(to_replace = 0, value = '/', inplace =True)
+    for col in df_input.columns:
+        if df_input[col].dtype == 'object':
+            df_input[col].replace(to_replace = 0, value = '/', inplace =True)
 
     # the following for loop returns a dict where keys are columns 
     # with no assigned entity and values are a list of the records of 
@@ -96,32 +120,20 @@ def ner(df_input_path): #df_input_path: string containing path of csv file
 
     keyColumns_valueNone = {}
 
-    for i in df_input.columns:
-        if df_input[i].dtype == 'object' and dict_global_entities[i] == None:
-            for j in range (0, df_input.shape[0]):
-                keyColumns_valueNone[i]= [w for w in df_input[i]] 
-    
-    # applying nlp_model to recognize entities
-
-    for i in keyColumns_valueNone.keys():
-        keyColumns_valueNone[i] = nlp_model(keyColumns_valueNone[i])
+    for col in df_input.columns:
+        if df_input[col].dtype == 'object' and dict_global_entities[col] == None:
+            keyColumns_valueNone[col]= nlp_model(df_input[col].to_list())
     
     keyColumns_valueEntities = {}
-
-    for i in keyColumns_valueNone.keys():
-        #print(i, dict_of_entities[i])
-        lst_of_entities_for_keys = []
-        for j in range(0, len(keyColumns_valueNone[i])):
-            if len(keyColumns_valueNone[i][j]) > 0:
-                #print(i, dict_of_entities[i][j])
-                for w in range(0, len(keyColumns_valueNone[i][j])):
-                    lst_of_entities_for_keys.append(keyColumns_valueNone[i][j][w]['entity'])
-                    keyColumns_valueEntities[i] = lst_of_entities_for_keys
     
-    key_columns = [key for key in keyColumns_valueEntities.keys()]
+    for col,big_list in keyColumns_valueNone.items():
+        flat_entity_list = [entity_dict for sublist in big_list for entity_dict in sublist]
+        keyColumns_valueEntities[col] = [entity['entity'] for entity in flat_entity_list]
+
+    key_columns = [key for key in keyColumns_valueEntities]
     for col in key_columns:
-        lista = [i for i in keyColumns_valueEntities[col]]
-        if (('B-ORG' in lista)) and (
+        list_entities = keyColumns_valueEntities[col]
+        if (('B-ORG' in list_entities)) and (
             len([i for i in keyColumns_valueEntities[col] if ((i == 'B-ORG'))]) > 0.1 * df_input.shape[0]):
             dict_global_entities[col] = ['ORGANIZATION', len([i for i in keyColumns_valueEntities[col] 
                     if (i == 'B-ORG')])/df_input.shape[0]]
