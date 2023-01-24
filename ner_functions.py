@@ -7,6 +7,20 @@ from transformers import pipeline
 
 
 def fill_na_on_object_columns_with_zero(df_input: pd.DataFrame) -> pd.DataFrame :
+    """
+    This function fills all the NA and/or Nan values on an object column with zero.
+    It returns a copy of the original dataframe where NA and/or Nan values in object columns are filled with zero.
+
+    Parameters
+    ----------
+    df_input : pd.DataFrame
+        String containing path of csv file
+
+    Returns
+    -------
+    pd.DataFrame
+        Copy of the original dataframe where NA or Nan values in object columns are filled with zero.
+    """
     df_fill_na_zero = df_input
 
     for col in df_fill_na_zero.columns:
@@ -17,8 +31,23 @@ def fill_na_on_object_columns_with_zero(df_input: pd.DataFrame) -> pd.DataFrame 
 
 
 def add_address_entity(additional_addresses: Optional[List] = []) -> PatternRecognizer:
-    #add some lists with rules to identify customed entity
+    """
+    This function allows to an user to create a customized presidio recognizer that 
+    is able to recognize address entity.
 
+    Some address-related words are already set, but an user can add ither new words. 
+
+    Parameters
+    ----------
+    additional_addresses : Optional[List], optional
+        It is a list in which an user can add new address-related words, by default []
+
+    Returns
+    -------
+    PatternRecognizer
+        It is the customized presidio recognizer
+    """
+    
     addresses = ['Street', 'Rue', 'Via', 'Square', 'Avenue', 'Place', 'Strada', 'St', 'Lane', 
     'Road', 'Boulevard', 'Ln', "Rd", "Highway" "Drive", "Av", "Hwy", "Blvd", "Corso", "Piazza", 
     "Calle", "Plaza", "Avenida", "Rambla", "C/"]
@@ -117,64 +146,6 @@ def assign_entities(df_input: pd.DataFrame, dict_global_entities: Dict, dict_typ
     return dict_global_entities
 
 
-     
-
-def ner_presidio(df_input_path: pd.DataFrame, data_sample: int = 500) -> Dict:
-    """This function takes as input a dataframe and try to assign to each object column an entity.
-    It returns a dictionary with columns' names as keys and a list as values.
-
-    The list contains the entity associated to the column and a confidence score.
-    The confidence score is the probability that a column is associated with the correct entity. 
-
-    Parameters
-    ----------
-    df_input_path : pd.DataFrame
-        It is a dataset
-    data_sample : int, optional
-        It is a sample of the previous dataset, by default 500. 
-        The fuction takes a sample of the original datset to reduce computational costs.
-
-    Returns
-    -------
-    Dict
-        It returns a dictionary with columns' names as keys and a list as values.
-
-    The list contains the entity associated to the column and a confidence score.
-    The confidence score is the probability that a column is associated with the correct entity. 
-    """
-    #df_input_path: string containing path of csv file
-    print('Starting...')
-
-    df_input = pd.read_csv(df_input_path)
-    df_input = df_input.sample(n=min(data_sample, df_input.shape[0]))
-
-    # this for loop fillna in object column with zero
-
-    df_input = fill_na_on_object_columns_with_zero (df_input) 
-
-    #add some rules to identify address entity
-    addresses_recognizer = add_address_entity()
-    analyzer = set_analyzer(addresses_recognizer)
-    analyzer_results = get_analyzer_results(df_input, analyzer)
-
-    dict_global_entities = {}
-    list_of_df_cols = list(df_input.columns)
-
-    dict_global_entities = assign_none_value(list_of_df_cols, dict_global_entities)
-    dict_global_entities = assign_zipcode_entity(list_of_df_cols, dict_global_entities)
-    dict_global_entities = assign_credit_card_entity(list_of_df_cols, dict_global_entities)
-
-    dict_type_object_entities = {}
-
-    dict_type_object_entities = assign_entity_to_object_columns(df_input, analyzer_results, dict_type_object_entities)
-
-    cols = get_columns_with_assigned_entity(df_input, dict_type_object_entities)
-    dict_global_entities = assign_location_entity(df_input, dict_global_entities, dict_type_object_entities, cols)
-    dict_global_entities = assign_entities(df_input, dict_global_entities, dict_type_object_entities, cols)
-
-    
-    return dict_global_entities
-
 def fill_na_on_object_columns_with_slash(df_input: pd.DataFrame) -> pd.DataFrame :
     df_fill_na_slash = df_input
 
@@ -216,16 +187,91 @@ def assign_organization_entity(df_input: pd.DataFrame, keyColumns_valueEntities:
                     if (i == 'B-ORG')])/df_input.shape[0]]
     
     return dict_global_entities
+
+
+def ner_presidio(df_input_path: pd.DataFrame, data_sample: int = 500) -> Dict:
+    """
+    This function takes as input a dataframe and try to assign to each object column an entity.
+    It returns a dictionary with columns' names as keys and a list as values.
+
+    The list contains the entity associated to the column and a confidence score.
+    The confidence score is the probability that a column is associated with the correct entity. 
+
+    Parameters
+    ----------
+    df_input_path : pd.DataFrame
+        String containing path of csv file
+    data_sample : int, optional
+        It is a sample of the previous dataset, by default 500. 
+        The fuction takes a sample of the original datset to reduce computational costs.
+
+    Returns
+    -------
+    Dict
+        It returns a dictionary with columns' names as keys and a list as values.
+
+    The list contains the entity associated to the column and a confidence score.
+    The confidence score is the probability that a column is associated with the correct entity. 
+    """
+
+    df_input = pd.read_csv(df_input_path)
+    df_input = df_input.sample(n=min(data_sample, df_input.shape[0]))
+
+    df_input = fill_na_on_object_columns_with_zero (df_input) 
+
+    addresses_recognizer = add_address_entity()
+    analyzer = set_analyzer(addresses_recognizer)
+    analyzer_results = get_analyzer_results(df_input, analyzer)
+
+    dict_global_entities = {}
+    list_of_df_cols = list(df_input.columns)
+
+    dict_global_entities = assign_none_value(list_of_df_cols, dict_global_entities)
+    dict_global_entities = assign_zipcode_entity(list_of_df_cols, dict_global_entities)
+    dict_global_entities = assign_credit_card_entity(list_of_df_cols, dict_global_entities)
+
+    dict_type_object_entities = {}
+
+    dict_type_object_entities = assign_entity_to_object_columns(df_input, analyzer_results, dict_type_object_entities)
+
+    cols = get_columns_with_assigned_entity(df_input, dict_type_object_entities)
+    dict_global_entities = assign_location_entity(df_input, dict_global_entities, dict_type_object_entities, cols)
+    dict_global_entities = assign_entities(df_input, dict_global_entities, dict_type_object_entities, cols)
+
+    
+    return dict_global_entities
     
 
 
 
 def ner_organization_entity(df_input_path: pd.DataFrame, dict_global_entities: Dict, data_sample: int = 500) -> Dict:
+    """
+    This function associates organization entity to dataframe columns. 
+    It uses a pretrained nlp model downloaded from Hugging Face (https://huggingface.co/dslim/bert-base-NER)
+    to recognize organization entities.
+
+    This function has to be applied after ner_presidio function.
+
+    Parameters
+    ----------
+    df_input_path : pd.DataFrame
+        String containing path of csv file
+    dict_global_entities : Dict
+        It is a dictionary where keys are the dataframe's columns and values are a list 
+    containing the type of entity associated to a column and a confidence score.
+    data_sample : int, optional
+        This parameter sets the number of row to take to sample the original dataset, by default 500.
+        it is necessary to reduce computational costs.
+
+    Returns
+    -------
+    Dict
+        It is a dictionary where keys are the dataframe's columns and values are a list 
+    containing the type of entity associated to a column and a confidence score.
+    """
     
     df_input = pd.read_csv(df_input_path)
     df_input = df_input.sample(n=min(data_sample, df_input.shape[0]))
-
-    # this for loop fillna in object column with zero
 
     df_input = fill_na_on_object_columns_with_slash(df_input) 
     nlp_model = set_nlp_model()
@@ -240,5 +286,38 @@ def ner_organization_entity(df_input_path: pd.DataFrame, dict_global_entities: D
     dict_global_entities = assign_organization_entity(df_input, keyColumns_valueEntities, dict_global_entities)
 
     return dict_global_entities
+
+
+def get_dict_entities_confidence_score(df_input_path: pd.DataFrame) -> Dict:
+    """
+    This function takes as input a dataframe and 
+    applies ner_presidio function and the ner_organization_entity function on the dataframe.
+
+    It returns a dictionary where keys are the dataframe's columns and values are a dictionary 
+    containing the type of entity associated to a column and a confidence score.
+
+    The confidence score is the probability that a column is associated with the correct entity.
+
+    Parameters
+    ----------
+    df_input_path : pd.DataFrame
+        String containing path of csv file
+
+    Returns
+    -------
+    Dict
+        In this dictionary, keys have the same names of the dataframe columns and values are dictionaries in 
+        which the entity associated to the column and its confidence score are reported.
+    """
+    dict_global_entities = ner_presidio(df_input_path)
+    dict_global_entities = ner_organization_entity(df_input_path, dict_global_entities)
+
+    for col in dict_global_entities:
+        if dict_global_entities[col] is not None:
+            dict_global_entities[col] = {'entity': dict_global_entities[col][0],'confidence_score' : dict_global_entities[col][1]}
+
+
+    return dict_global_entities
+
 
     
