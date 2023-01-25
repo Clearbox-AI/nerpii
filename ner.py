@@ -126,8 +126,8 @@ def ner(df_input_path: pd.DataFrame, data_sample: int = 500) -> Dict:
     
     keyColumns_valueEntities = {}
     
-    for col,big_list in keyColumns_valueNone.items():
-        flat_entity_list = [entity_dict for sublist in big_list for entity_dict in sublist]
+    for col, dict_value in keyColumns_valueNone.items():
+        flat_entity_list = [entity_dict for sublist in dict_value for entity_dict in sublist]
         keyColumns_valueEntities[col] = [entity['entity'] for entity in flat_entity_list]
 
     key_columns = [key for key in keyColumns_valueEntities]
