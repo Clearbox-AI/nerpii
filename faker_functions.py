@@ -15,7 +15,7 @@ def get_columns_with_assigned_entity (dict_of_global_entities: Dict):
     return columns_with_assigned_entity
 
 
-def get_synthetic_address (df_input: pd.DataFrame, addresses: List):
+def get_address (df_input: pd.DataFrame, addresses: List):
 
     faker = Faker()
     for i in addresses:
@@ -23,7 +23,7 @@ def get_synthetic_address (df_input: pd.DataFrame, addresses: List):
     
     return df_input
 
-def get_synthetic_phone_number (df_input: pd.DataFrame, phone_number: List):
+def get_phone_number (df_input: pd.DataFrame, phone_number: List):
 
     faker = Faker()
     for i in phone_number:
@@ -114,8 +114,8 @@ def get_synthetic_dataset (df_input: pd.DataFrame, dict_of_global_entities: Dict
 
     
 
-    df_input = get_synthetic_address (df_input, addresses)
-    df_input = get_synthetic_phone_number (df_input, phone_number)
+    df_input = get_address (df_input, addresses)
+    df_input = get_phone_number (df_input, phone_number)
     df_input = get_email_address (df_input, email_address)
     df_input = get_person(df_input, person)
     df_input = get_first_name(df_input, first_name_person)
