@@ -5,7 +5,7 @@ from ner_functions import get_dict_entities_confidence_score
 from faker import Faker
 
 
-def get_columns_with_assigned_entity (dict_of_global_entities: Dict):
+def get_columns_with_assigned_entity (dict_of_global_entities: Dict) -> List:
 
     if len(dict_of_global_entities) > 0:
         columns_with_assigned_entity = [[i, dict_of_global_entities[i]['entity']] for i in dict_of_global_entities if dict_of_global_entities[i] is not None and dict_of_global_entities[i]['confidence_score'] > 0.4]
@@ -15,7 +15,7 @@ def get_columns_with_assigned_entity (dict_of_global_entities: Dict):
     return columns_with_assigned_entity
 
 
-def get_address (df_input: pd.DataFrame, addresses: List):
+def get_address (df_input: pd.DataFrame, addresses: List) -> pd.DataFrame:
 
     faker = Faker()
     for i in addresses:
@@ -23,7 +23,7 @@ def get_address (df_input: pd.DataFrame, addresses: List):
     
     return df_input
 
-def get_phone_number (df_input: pd.DataFrame, phone_number: List):
+def get_phone_number (df_input: pd.DataFrame, phone_number: List) -> pd.DataFrame:
 
     faker = Faker()
     for i in phone_number:
@@ -31,14 +31,14 @@ def get_phone_number (df_input: pd.DataFrame, phone_number: List):
     
     return df_input
 
-def get_email_address (df_input: pd.DataFrame, email_address: List):
+def get_email_address (df_input: pd.DataFrame, email_address: List) -> pd.DataFrame:
     faker = Faker()
     for i in email_address:
             df_input[i] = [faker.free_email() for i in range(df_input.shape[0])]
     
     return df_input
 
-def get_first_name (df_input: pd.DataFrame, first_name_person: List):
+def get_first_name (df_input: pd.DataFrame, first_name_person: List) -> pd.DataFrame:
 
     faker = Faker()
     for i in first_name_person:
@@ -46,7 +46,7 @@ def get_first_name (df_input: pd.DataFrame, first_name_person: List):
     
     return df_input
 
-def get_last_name (df_input: pd.DataFrame, last_name_person: List):
+def get_last_name (df_input: pd.DataFrame, last_name_person: List) -> pd.DataFrame:
 
     faker = Faker()
     for i in last_name_person:
@@ -54,7 +54,7 @@ def get_last_name (df_input: pd.DataFrame, last_name_person: List):
     
     return df_input
 
-def get_person (df_input: pd.DataFrame, person: List):
+def get_person (df_input: pd.DataFrame, person: List) -> pd.DataFrame:
 
     faker = Faker()
     for i in person:
@@ -62,7 +62,7 @@ def get_person (df_input: pd.DataFrame, person: List):
     
     return df_input
 
-def get_city (df_input: pd.DataFrame, city: List):
+def get_city (df_input: pd.DataFrame, city: List) -> pd.DataFrame:
 
     faker = Faker()
     for i in city:
@@ -70,7 +70,7 @@ def get_city (df_input: pd.DataFrame, city: List):
     
     return df_input
 
-def get_city (df_input: pd.DataFrame, city: List):
+def get_city (df_input: pd.DataFrame, city: List) -> pd.DataFrame:
 
     faker = Faker()
     for i in city:
@@ -78,7 +78,7 @@ def get_city (df_input: pd.DataFrame, city: List):
     
     return df_input
 
-def get_state(df_input: pd.DataFrame, state: List):
+def get_state(df_input: pd.DataFrame, state: List) -> pd.DataFrame:
     faker = Faker()
     for i in state:
         if len(df_input[i].iloc[0]) == 2:
@@ -88,20 +88,23 @@ def get_state(df_input: pd.DataFrame, state: List):
     
     return df_input
 
-def get_state_full_name(df_input: pd.DataFrame, state: List):
+def get_url (df_input: pd.DataFrame, url: List) -> pd.DataFrame:
     faker = Faker()
-    for i in state:
-        if len(df_input[i].iloc[0]) == 2:
-            df_input[i] = [faker.state() for i in range(df_input.shape[0])]
+    for i in url:
+        df_input[i] = [faker.url() for i in range(df_input.shape[0])]
     
     return df_input
+    
 
 
 
 
-def get_synthetic_dataset (df_input: pd.DataFrame, dict_of_global_entities: Dict):
+
+
+def get_synthetic_dataset (df_input: pd.DataFrame, dict_of_global_entities: Dict)  -> pd.DataFrame:
 
     columns_with_assigned_entity = get_columns_with_assigned_entity(dict_of_global_entities)
+    
 
     addresses = [i[0] for i in columns_with_assigned_entity if i[1] == 'ADDRESS']
     phone_number  = [i[0] for i in columns_with_assigned_entity if i[1] == 'PHONE_NUMBER']
@@ -111,7 +114,9 @@ def get_synthetic_dataset (df_input: pd.DataFrame, dict_of_global_entities: Dict
     person = [i[0] for i in columns_with_assigned_entity if i[1] == 'PERSON']
     city = [i[0] for i in columns_with_assigned_entity if i[1] == 'LOCATION' and (('city' in i[0].lower()) or ('cities' in i[0].lower()))]
     state = [i[0] for i in columns_with_assigned_entity if i[1] == 'LOCATION' and ('state' in i[0].lower())]
+    url = [i[0] for i in columns_with_assigned_entity if i[1] == 'URL']
 
+    
     
 
     df_input = get_address (df_input, addresses)
@@ -122,6 +127,7 @@ def get_synthetic_dataset (df_input: pd.DataFrame, dict_of_global_entities: Dict
     df_input = get_last_name(df_input, last_name_person)
     df_input = get_city(df_input, city)
     df_input = get_state(df_input, state)
+    df_input = get_url(df_input, url)
     
 
     
