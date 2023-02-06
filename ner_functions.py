@@ -332,7 +332,7 @@ def set_nlp_model(model = "dslim/bert-base-NER") -> Any:
         String containing the name of the nlp model, by default "dslim/bert-base-NER"
 
     Returns
-    -------
+    -------  
         Pipeline function from Hugging Face transformers library
     """
 
