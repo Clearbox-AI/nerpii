@@ -156,6 +156,18 @@ def get_url (df_input: pd.DataFrame, url: List) -> pd.DataFrame:
     
     return df_input
 
+def get_zipcode (df_input: pd.DataFrame, zipcode: List) -> pd.DataFrame:
+
+    faker = Faker()
+    for i in zipcode:
+        df_input[i] =  df_input.apply(lambda row: faker.zipcode() , axis = 1)
+        
+    if len(zipcode) > 0:
+        synthesis_message(zipcode)
+
+    return df_input
+
+
 
     
 
@@ -176,6 +188,7 @@ def get_synthetic_dataset (df_input: pd.DataFrame, dict_of_global_entities: Dict
     city = [i[0] for i in columns_with_assigned_entity if i[1] == 'LOCATION' and (('city' in i[0].lower()) or ('cities' in i[0].lower()))]
     state = [i[0] for i in columns_with_assigned_entity if i[1] == 'LOCATION' and ('state' in i[0].lower())]
     url = [i[0] for i in columns_with_assigned_entity if i[1] == 'URL']
+    zipcode = [i[0] for i in columns_with_assigned_entity if i[1] == 'ZIPCODE']
 
     
     
@@ -190,6 +203,7 @@ def get_synthetic_dataset (df_input: pd.DataFrame, dict_of_global_entities: Dict
     df_input = get_city(df_input, city)
     df_input = get_state(df_input, state)
     df_input = get_url(df_input, url)
+    df_input = get_zipcode(df_input, zipcode)
     
 
 
