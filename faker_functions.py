@@ -113,6 +113,49 @@ def synthesis_message (list_faker: List, list_not_faker:List) -> str:
 
     return 
 
+def split_name(df_input: pd.DataFrame, name_of_column: str) -> pd.DataFrame:
+    """
+    Return a pandas dataframe where a given column with person's name is splitted into two columns: first_name and last_name
+
+    Parameters
+    ----------
+    df_input : pd.DataFrame
+        A pandas dataframe
+    name_of_column : str
+        name of the column which contains names that have to be splitted
+
+    Returns
+    -------
+    pd.DataFrame
+        A pandas dataframe with first_name and last_name columns
+    """
+
+    column = df_input[name_of_column]
+
+    if column.isna().any():
+        column.fillna('- -', inplace = True)
+
+    lista_nomi = []
+    for i in column:
+        lista_nomi.append(i.split())
+    
+    for i in lista_nomi:
+        if len(i) < 2:
+            i.append('-')
+
+    nomi = []
+    cognomi = [] 
+    for i in lista_nomi:
+        nomi.append(i[0])
+        cognomi.append(i[1])
+    
+    df_input['first_name'] = pd.Series(nomi)
+    df_input['last_number'] = pd.Series(cognomi)
+
+    df_input = df_input.drop(name_of_column, axis = 1)
+
+    return df_input
+    
 
 
 
