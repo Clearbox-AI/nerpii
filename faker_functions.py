@@ -305,7 +305,7 @@ def get_city (df_input: pd.DataFrame, city: List, list_faker: List) -> pd.DataFr
     df_input : pd.DataFrame
         A pandas dataframe that needs to be analyzed
     city : List
-        A list of columns to which the entity "CITY" is assigned
+        A list of columns to which the entity "LOCATION" is assigned and whose column name contains "city"
     list_faker : List
         A list containing the synthesized columns
 
@@ -336,7 +336,7 @@ def get_state(df_input: pd.DataFrame, state: List, list_faker: List) -> pd.DataF
     df_input : pd.DataFrame
         A pandas dataframe that needs to be analyzed
     state : List
-        A list of columns to which the entity "STATE" is assigned
+        A list of columns to which the entity "LOCATION" is assigned and whose column name contains "state"
     list_faker : List
         A list containing the synthesized columns
 
@@ -474,6 +474,36 @@ def get_ssn (df_input: pd.DataFrame, ssn: List, list_faker: List) -> pd.DataFram
     return df_input, list_faker
 
 
+def get_country (df_input: pd.DataFrame, country: List, list_faker: List) -> pd.DataFrame:
+    """
+    Return pandas dataframe where country columns are synthesized.
+
+    Parameters
+    ----------
+    df_input : pd.DataFrame
+        A pandas dataframe that needs to be analyzed
+    country : List
+        A list of columns to which the entity "LOCATION" is assigned and whose column name contains "country"
+    list_faker : List
+        A list containing the synthesized columns
+
+    Returns
+    -------
+    pd.DataFrame
+        A pandas dataframe with synthesized country columns 
+    list_faker
+        A list containing the synthesized columns
+    """
+
+    faker = Faker()
+    for i in country:
+        df_input[i] =  df_input.apply(lambda row: faker.country() , axis = 1)
+        
+        list_faker.append(i)
+
+    return df_input, list_faker
+
+
 
     
 
@@ -513,6 +543,7 @@ def get_synthetic_dataset (df_input: pd.DataFrame, dict_of_global_entities: Dict
     zipcode = [i[0] for i in columns_with_assigned_entity if i[1] == 'ZIPCODE']
     credit_card = [i[0] for i in columns_with_assigned_entity if i[1] == 'CREDIT_CARD_NUMBER']
     ssn = [i[0] for i in columns_with_assigned_entity if i[1] == 'US_SSN']
+    country = [i[0] for i in columns_with_assigned_entity if i[1] == 'LOCATION' and ('country' in i[0].lower())]
 
     
     list_faker = []
@@ -529,6 +560,7 @@ def get_synthetic_dataset (df_input: pd.DataFrame, dict_of_global_entities: Dict
     df_input, list_faker = get_zipcode(df_input, zipcode, list_faker)
     df_input, list_faker = get_credit_card (df_input, credit_card, list_faker)
     df_input, list_faker = get_ssn (df_input, ssn, list_faker)
+    df_input, list_faker = get_country (df_input, country, list_faker)
     
 
     columns_not_synthesized = get_columns_not_synthesized(columns_with_assigned_entity, list_faker, columns_with_low_cs)
