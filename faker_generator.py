@@ -1,56 +1,12 @@
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Any, Union
 
 import pandas as pd
-from ner_functions import get_entities_confidence_score
 from faker import Faker
 import gender_guesser.detector as gender
 from simple_colors import *
 import re
 import numpy as np
 
-
-def split_name(df_input: pd.DataFrame, name_of_column: str) -> pd.DataFrame:
-    """
-    Return a pandas dataframe where a given column with person's name is splitted into two columns: first_name and last_name
-
-    Parameters
-    ----------
-    df_input : pd.DataFrame
-        A pandas dataframe
-    name_of_column : str
-        name of the column which contains names that have to be splitted
-
-    Returns
-    -------
-    pd.DataFrame
-        A pandas dataframe with first_name and last_name columns
-    """
-
-    column = df_input[name_of_column]
-
-    if column.isna().any():
-        column.fillna('- -', inplace = True)
-
-    lista_nomi = []
-    for i in column:
-        lista_nomi.append(i.split())
-    
-    for i in lista_nomi:
-        if len(i) < 2:
-            i.append('-')
-
-    nomi = []
-    cognomi = [] 
-    for i in lista_nomi:
-        nomi.append(i[0])
-        cognomi.append(i[1])
-    
-    df_input['first_name'] = pd.Series(nomi)
-    df_input['last_number'] = pd.Series(cognomi)
-
-    df_input = df_input.drop(name_of_column, axis = 1)
-
-    return df_input
 
 
 class FakerGenerator:

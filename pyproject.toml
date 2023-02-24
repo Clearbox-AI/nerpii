@@ -1,0 +1,29 @@
+[tool.poetry]
+name = "clearbox-ner"
+version = "0.1.0"
+description = ""
+authors = ["Clearbox-AI"]
+readme = "README.md"
+packages = [{include = "clearbox_ner"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+pandas = "^1.5.3"
+presidio-analyzer = "^2.2.32"
+spacy = "^3.5.0"
+transformers = "^4.26.1"
+torch = "^1.13.1"
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.21.1"
+
+
+[tool.poetry.dependencies.en_core_web_lg]
+url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.5.0/en_core_web_lg-3.5.0.tar.gz"
+
+
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
