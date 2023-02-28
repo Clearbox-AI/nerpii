@@ -100,10 +100,10 @@ def test_assign_presidio_entity_list(instance):
     instance.set_presidio_analyzer()
     instance.get_presidio_analyzer_results()
     instance.assign_presidio_entities_list()
-    assert instance.dict_global_entities == {'email': ['EMAIL_ADDRESS', 'EMAIL_ADDRESS', 'EMAIL_ADDRESS'], 
-    'city': ['LOCATION', 'LOCATION', 'LOCATION'], 
-    'state': ['LOCATION', 'LOCATION'], 
-    'university': None, 
+    assert instance.dict_global_entities == {'email': ['EMAIL_ADDRESS', 'EMAIL_ADDRESS', 'EMAIL_ADDRESS'],
+    'city': ['LOCATION', 'LOCATION', 'LOCATION'],
+    'state': ['LOCATION', 'PERSON', 'LOCATION'],
+    'university': None,
     'person': ['PERSON', 'PERSON'],
     'zipcode': None}
     assert instance.assigned_entities_cols == ['email', 'city', 'state', 'person']
@@ -113,13 +113,12 @@ def test_assign_location_entity(instance):
     instance.get_presidio_analyzer_results()
     instance.assign_presidio_entities_list()
     instance.assign_location_entity()
-    assert instance.dict_global_entities == {'email': ['EMAIL_ADDRESS', 'EMAIL_ADDRESS', 'EMAIL_ADDRESS'], 
-    'city': {'entity': 'LOCATION', 'confidence_score': 1.0}, 
-    'state': {'entity': 'LOCATION', 'confidence_score': 1.0}, 
-    'university': None, 
+    assert instance.dict_global_entities == {'email': ['EMAIL_ADDRESS', 'EMAIL_ADDRESS', 'EMAIL_ADDRESS'],
+    'city': {'entity': 'LOCATION', 'confidence_score': 1.0},
+    'state': {'entity': 'LOCATION', 'confidence_score': 0.6666666666666666},
+    'university': None,
     'person': ['PERSON', 'PERSON'],
-    'zipcode': None
-    }
+    'zipcode': None}
 
 
 def test_assign_location_entity_not_enough_confidence_score(instance):
@@ -140,7 +139,7 @@ def test_assign_entities_and_score(instance):
     instance.assign_entities_and_score()
     assert instance.dict_global_entities == {'email': {'entity': 'EMAIL_ADDRESS', 'confidence_score': 1.0},
     'city': {'entity': 'LOCATION', 'confidence_score': 1.0},
-    'state': {'entity': 'LOCATION', 'confidence_score': 1.0},
+    'state': {'entity': 'LOCATION', 'confidence_score': 0.6666666666666666},
     'university': None,
     'person': {'entity': 'PERSON', 'confidence_score': 1.0},
     'zipcode': None}

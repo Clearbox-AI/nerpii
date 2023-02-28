@@ -10,18 +10,16 @@ packages = [{include = "clearbox_ner"}]
 python = "^3.9"
 pandas = "^1.5.3"
 presidio-analyzer = "^2.2.32"
-spacy = "^3.5.0"
 transformers = "^4.26.1"
 torch = "^1.13.1"
+faker = "^17.3.0"
+gender-guesser = "^0.4.0"
+simple-colors = "^0.1.5"
+spacy = "^3.5.0"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.21.1"
-
-
-[tool.poetry.dependencies.en_core_web_lg]
-url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.5.0/en_core_web_lg-3.5.0.tar.gz"
-
-
+pytest = "^7.2.1"
 
 
 [build-system]
