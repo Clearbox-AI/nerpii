@@ -5,7 +5,8 @@ import pandas as pd
 from presidio_analyzer import AnalyzerEngine, BatchAnalyzerEngine, PatternRecognizer
 from transformers import AutoTokenizer, AutoModelForTokenClassification, pipeline
 
-from spacy.cli import download
+import spacy
+
 
 #è importante eseguire prima assign_entities_with_presidio, poi assign_entities_manually, infine assisgn_entities_with_model
 
@@ -124,7 +125,7 @@ class NamedEntityRecognizer:
         are dictionaries in which the entity associated to the column and its confidence 
         score are reported.
     spacy_model : Any
-        A english spacy model
+        An english spacy model
 
 
     Returns
@@ -141,6 +142,7 @@ class NamedEntityRecognizer:
     model_entities: Dict
     dict_global_entities: Dict
     spacy_model: Any
+    
     
     
     def __init__(self, df_input: Union[str, pd.DataFrame], data_sample: Optional[int] = 500, nan_filler: str = "?") -> "NamedEntityRecognizer":
@@ -178,7 +180,12 @@ class NamedEntityRecognizer:
         self.model_entities = {}
         self.assigned_entities_cols = []
 
-        self.spacy_model = download("en_core_web_lg")
+        spacy_model_name = 'en_core_web_lg'
+        if not spacy.util.is_package(spacy_model_name):
+            spacy.cli.download(spacy_model_name)
+        self.spacy_model = spacy.load(spacy_model_name)
+
+        
         
     def set_presidio_analyzer(self, add_addresses_recognizer: Optional[bool] = True, additional_addresses: Optional[List] = []) -> None:
         """

@@ -6,7 +6,9 @@ import gender_guesser.detector as gender
 from simple_colors import *
 import re
 import numpy as np
-from spacy.cli import download
+
+
+
 
 
 
@@ -45,7 +47,7 @@ class FakerGenerator:
     columns_with_assigned_entity: List 
     columns_not_synthesized: List 
     list_faker: List
-    spacy_model: Any
+   
 
     def __init__(self, df_input: Union[str, pd.DataFrame], dict_global_entities: Dict) -> "FakerGenerator":
         """
@@ -76,7 +78,8 @@ class FakerGenerator:
         self.columns_with_assigned_entity = []
         self.columns_not_synthesized = []
         self.list_faker = []
-        self.spacy_model = download("en_core_web_lg")
+
+        
         
 
     
