@@ -247,7 +247,8 @@ class NamedEntityRecognizer:
                 # If the number of entities is more than 30% of the number of records, assign the list to the column
                 if len(entities_list) > 0.3 * self.dataset.shape[0]:
                     self.dict_global_entities[col_name] = entities_list
-                    self.assigned_entities_cols.append(col_name)
+                    if col_name not in self.assigned_entities_cols:
+                        self.assigned_entities_cols.append(col_name)
     
     def assign_location_entity(self) -> None:
         """
