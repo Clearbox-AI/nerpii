@@ -5,6 +5,8 @@ import pandas as pd
 from presidio_analyzer import AnalyzerEngine, BatchAnalyzerEngine, PatternRecognizer
 from transformers import AutoTokenizer, AutoModelForTokenClassification, pipeline
 
+import spacy
+
 
 #è importante eseguire prima assign_entities_with_presidio, poi assign_entities_manually, infine assisgn_entities_with_model
 
@@ -122,6 +124,8 @@ class NamedEntityRecognizer:
         A dictionary whose keys have the same names of the dataframe columns and values 
         are dictionaries in which the entity associated to the column and its confidence 
         score are reported.
+    spacy_model : Any
+        An english spacy model
 
 
     Returns
@@ -137,6 +141,8 @@ class NamedEntityRecognizer:
     model: Any
     model_entities: Dict
     dict_global_entities: Dict
+    spacy_model: Any
+    
     
     
     def __init__(self, df_input: Union[str, pd.DataFrame], data_sample: Optional[int] = 500, nan_filler: str = "?") -> "NamedEntityRecognizer":
@@ -173,6 +179,13 @@ class NamedEntityRecognizer:
         self.dict_global_entities = dict.fromkeys(list(self.dataset.columns))
         self.model_entities = {}
         self.assigned_entities_cols = []
+
+        spacy_model_name = 'en_core_web_lg'
+        if not spacy.util.is_package(spacy_model_name):
+            spacy.cli.download(spacy_model_name)
+        self.spacy_model = spacy.load(spacy_model_name)
+
+        
         
     def set_presidio_analyzer(self, add_addresses_recognizer: Optional[bool] = True, additional_addresses: Optional[List] = []) -> None:
         """
@@ -234,7 +247,8 @@ class NamedEntityRecognizer:
                 # If the number of entities is more than 30% of the number of records, assign the list to the column
                 if len(entities_list) > 0.3 * self.dataset.shape[0]:
                     self.dict_global_entities[col_name] = entities_list
-                    self.assigned_entities_cols.append(col_name)
+                    if col_name not in self.assigned_entities_cols:
+                        self.assigned_entities_cols.append(col_name)
     
     def assign_location_entity(self) -> None:
         """
