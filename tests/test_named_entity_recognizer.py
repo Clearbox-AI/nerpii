@@ -1,17 +1,17 @@
-import named_entity_recognizer
+from clearbox_ner.named_entity_recognizer import *
 
 from presidio_analyzer import BatchAnalyzerEngine, PatternRecognizer
 from transformers import AutoTokenizer, AutoModelForTokenClassification, pipeline
-from named_entity_recognizer import *
+
 import pytest
 
 
 
 
 def test_frequency():
-    assert named_entity_recognizer.frequency(values=[2, 5, 5, 5, 7, 8, 9, 10], element= 5) == 0.375
-    assert named_entity_recognizer.frequency(values = ['apple', 'apple', 'banana', 'pineapple', 'apple', 'apple', 'pear', 'peach'], element= 'apple') == 0.5
-    assert named_entity_recognizer.frequency(values=[], element = 1) == 0
+    assert frequency(values=[2, 5, 5, 5, 7, 8, 9, 10], element= 5) == 0.375
+    assert frequency(values = ['apple', 'apple', 'banana', 'pineapple', 'apple', 'apple', 'pear', 'peach'], element= 'apple') == 0.5
+    assert frequency(values=[], element = 1) == 0
 
 
 def test_add_address_entity():
