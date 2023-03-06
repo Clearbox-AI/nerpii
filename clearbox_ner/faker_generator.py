@@ -9,6 +9,9 @@ import numpy as np
 
 
 
+
+
+
 class FakerGenerator:
     """
     A class used to generate faker objects in a dataframe
@@ -29,6 +32,8 @@ class FakerGenerator:
         A list of those columns which are not synthesized by faker
     list_faker : List
         A list of those columns which are synthesized by faker
+    spacy_model : Any
+        An english spacy model
 
     Returns
     -------
@@ -42,6 +47,7 @@ class FakerGenerator:
     columns_with_assigned_entity: List 
     columns_not_synthesized: List 
     list_faker: List
+   
 
     def __init__(self, df_input: Union[str, pd.DataFrame], dict_global_entities: Dict) -> "FakerGenerator":
         """
@@ -64,7 +70,7 @@ class FakerGenerator:
 
         if not isinstance(df_input, pd.DataFrame):
             df_input = pd.read_csv(df_input)
-        
+
 
         self.dataset = df_input
         self.dict_global_entities = dict_global_entities
@@ -72,6 +78,9 @@ class FakerGenerator:
         self.columns_with_assigned_entity = []
         self.columns_not_synthesized = []
         self.list_faker = []
+
+        
+        
 
     
     def get_columns_with_assigned_entity (self) -> None:

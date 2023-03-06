@@ -1,17 +1,17 @@
-import named_entity_recognizer
+from clearbox_ner.named_entity_recognizer import *
 
 from presidio_analyzer import BatchAnalyzerEngine, PatternRecognizer
 from transformers import AutoTokenizer, AutoModelForTokenClassification, pipeline
-from named_entity_recognizer import *
+
 import pytest
 
 
 
 
 def test_frequency():
-    assert named_entity_recognizer.frequency(values=[2, 5, 5, 5, 7, 8, 9, 10], element= 5) == 0.375
-    assert named_entity_recognizer.frequency(values = ['apple', 'apple', 'banana', 'pineapple', 'apple', 'apple', 'pear', 'peach'], element= 'apple') == 0.5
-    assert named_entity_recognizer.frequency(values=[], element = 1) == 0
+    assert frequency(values=[2, 5, 5, 5, 7, 8, 9, 10], element= 5) == 0.375
+    assert frequency(values = ['apple', 'apple', 'banana', 'pineapple', 'apple', 'apple', 'pear', 'peach'], element= 'apple') == 0.5
+    assert frequency(values=[], element = 1) == 0
 
 
 def test_add_address_entity():
@@ -46,7 +46,7 @@ def dataset():
     return pd.DataFrame({
     'email': ['John@email.com.', 'Snow@email.com', 'frank@email.com'],
     'city': ["New York", "Chicago", "Phoenix"],
-    'state': ['Washigton', 'Rhode Island', 'Texas'],
+    'state': ['Washington', 'Florida', 'Texas'],
     'university': ['University of London', 'University of Georgia', 'University of California'],
     'person': ['George Bush', None, 'Hillary Clinton'],
     'zipcode': ['10145', 'N11RG', '56178']
@@ -100,10 +100,10 @@ def test_assign_presidio_entity_list(instance):
     instance.set_presidio_analyzer()
     instance.get_presidio_analyzer_results()
     instance.assign_presidio_entities_list()
-    assert instance.dict_global_entities == {'email': ['EMAIL_ADDRESS', 'EMAIL_ADDRESS', 'EMAIL_ADDRESS'], 
-    'city': ['LOCATION', 'LOCATION', 'LOCATION'], 
-    'state': ['LOCATION', 'LOCATION'], 
-    'university': None, 
+    assert instance.dict_global_entities == {'email': ['EMAIL_ADDRESS', 'EMAIL_ADDRESS', 'EMAIL_ADDRESS'],
+    'city': ['LOCATION', 'LOCATION', 'LOCATION'],
+    'state': ['LOCATION', 'LOCATION', 'LOCATION'],
+    'university': None,
     'person': ['PERSON', 'PERSON'],
     'zipcode': None}
     assert instance.assigned_entities_cols == ['email', 'city', 'state', 'person']
@@ -113,13 +113,12 @@ def test_assign_location_entity(instance):
     instance.get_presidio_analyzer_results()
     instance.assign_presidio_entities_list()
     instance.assign_location_entity()
-    assert instance.dict_global_entities == {'email': ['EMAIL_ADDRESS', 'EMAIL_ADDRESS', 'EMAIL_ADDRESS'], 
-    'city': {'entity': 'LOCATION', 'confidence_score': 1.0}, 
-    'state': {'entity': 'LOCATION', 'confidence_score': 1.0}, 
-    'university': None, 
+    assert instance.dict_global_entities == {'email': ['EMAIL_ADDRESS', 'EMAIL_ADDRESS', 'EMAIL_ADDRESS'],
+    'city': {'entity': 'LOCATION', 'confidence_score': 1.0},
+    'state': {'entity': 'LOCATION', 'confidence_score': 1.0},
+    'university': None,
     'person': ['PERSON', 'PERSON'],
-    'zipcode': None
-    }
+    'zipcode': None}
 
 
 def test_assign_location_entity_not_enough_confidence_score(instance):

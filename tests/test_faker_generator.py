@@ -1,14 +1,10 @@
-from typing import Dict, List, Any, Union
+from typing import Dict
 
 import pandas as pd
 from faker import Faker
-import gender_guesser.detector as gender
-from simple_colors import *
-import re
-import numpy as np
 
-from named_entity_recognizer import *
-from faker_generator import *
+from clearbox_ner.named_entity_recognizer import NamedEntityRecognizer, split_name
+from clearbox_ner.faker_generator import FakerGenerator
 
 import pytest
 
