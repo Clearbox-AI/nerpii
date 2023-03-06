@@ -1,0 +1,7 @@
+[flake8]
+select = BLK, C, E, F, I, W
+max-complexity = 10
+ignore = E203, W503, C901, E712
+max-line-length = 88
+application-import-names = nerpii, tests
+import-order-style = google
