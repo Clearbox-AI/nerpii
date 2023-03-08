@@ -1,7 +1,7 @@
 # Nerpii 
 Nerpii is a Python library developed to perform Named Entity Recognition (NER) on structured datasets and synthesize Personal Identifiable Information (PIIs).
 
-The NER is performed with [Presidio](https://github.com/microsoft/presidio) and with an [NLP model](https://huggingface.co/dslim/bert-base-NER) available on HuggingFace, while the PII generation is based on [Faker](https://faker.readthedocs.io/en/master/).
+NER is performed with [Presidio](https://github.com/microsoft/presidio) and with a [NLP model](https://huggingface.co/dslim/bert-base-NER) available on HuggingFace, while the PII generation is based on [Faker](https://faker.readthedocs.io/en/master/).
 
 # Installation
 You can install Nerpii by using pip: 
@@ -20,7 +20,7 @@ You can create a recognizer passing as parameter a path to a csv file or a Panda
 ```python
 recognizer = NamedEntityRecognizer('./csv_path.csv')
 ```
-Please note that if in your dataset there are columns containing person names composed by first name and last name (e.g. John Smith), before creating a recognizer, you need to split the name into two different columns called <strong>first_name</strong> and <strong>last_name</strong> using the function `split_name()`.
+Please note that if there are columns in the dataset containing names of people consisting of first and last names (e.g. John Smith), before creating a recognizer, it is necessary to split the name into two different columns called <strong>first_name</strong> and <strong>last_name</strong> using the function `split_name()`.
 
 ```python
 from nerpii.named_entity_recognizer import split_name
@@ -52,8 +52,9 @@ recognizer.assign_entities_manually()
 recognizer.assign_organization_entity_with_model()
 ```
 
-The final output is a dictionary in which are reported the names of columns as keys and the assigned entities and a confidence score as values.
-You can access this dictionary using
+The final output is a dictionary in which column names are given as keys and assigned entities and a confidence score as values.
+
+This dictionary can be accessed using
 
 ```python
 recognizer.dict_global_entities
