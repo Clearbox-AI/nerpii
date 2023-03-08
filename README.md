@@ -81,7 +81,7 @@ To generate new PIIs you can run
 generator.get_faker_generation()
 ```
 The method above can generate the following PIIs:
-*  address
+* address
 * phone number
 * email naddress
 * first name
