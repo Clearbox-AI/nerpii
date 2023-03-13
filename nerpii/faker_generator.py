@@ -388,11 +388,11 @@ class FakerGenerator:
         """
 
         for col in self.list_faker:
-            message = "Column " + green(col, "bold") + " synthesized."
+            message = "Column " + green(col, "bold") + " synthesized with Faker."
             print(message)
 
         for col in self.columns_not_synthesized:
-            message = "Column " + red(col[0], "bold") + " not synthesized."
+            message = "Column " + red(col[0], "bold") + " not synthesized with Faker."
             print(message)
 
     def get_faker_generation(self) -> None:
