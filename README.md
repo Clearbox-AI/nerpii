@@ -1,5 +1,5 @@
 # Nerpii 
-Nerpii is a Python library developed to perform Named Entity Recognition (NER) on structured datasets and synthesize Personal Identifiable Information (PIIs).
+Nerpii is a Python library developed to perform Named Entity Recognition (NER) on structured datasets and synthesize Personal Identifiable Information (PII).
 
 NER is performed with [Presidio](https://github.com/microsoft/presidio) and with a [NLP model](https://huggingface.co/dslim/bert-base-NER) available on HuggingFace, while the PII generation is based on [Faker](https://faker.readthedocs.io/en/master/).
 
@@ -62,7 +62,7 @@ recognizer.dict_global_entities
 
 ## PII generation 
 
-After perfoming NER on a dataset, you can generate new PIIs using Faker. 
+After performing NER on a dataset, you can generate new PII using Faker. 
 
 You can import the FakerGenerator using 
 
