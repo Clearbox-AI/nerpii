@@ -1,16 +1,16 @@
 # Nerpii 
-Nerpii is a Python library developed to perform Named Entity Recognition (NER) on structured datasets and synthesize Personal Identifiable Information (PIIs).
+Nerpii is a Python library developed to perform Named Entity Recognition (NER) on structured datasets and synthesize Personal Identifiable Information (PII).
 
 NER is performed with [Presidio](https://github.com/microsoft/presidio) and with a [NLP model](https://huggingface.co/dslim/bert-base-NER) available on HuggingFace, while the PII generation is based on [Faker](https://faker.readthedocs.io/en/master/).
 
-# Installation
+## Installation
 You can install Nerpii by using pip: 
 
 ```python
 pip install nerpii
 ```
-# Quickstart
-## Named Entity Recognition
+## Quickstart
+### Named Entity Recognition
 You can import the NamedEntityRecognizer using
 ```python
 from nerpii.named_entity_recognizer import NamedEntityRecognizer
@@ -60,9 +60,9 @@ This dictionary can be accessed using
 recognizer.dict_global_entities
 ```
 
-## PII generation 
+### PII generation 
 
-After perfoming NER on a dataset, you can generate new PIIs using Faker. 
+After performing NER on a dataset, you can generate new PII using Faker. 
 
 You can import the FakerGenerator using 
 
@@ -75,7 +75,7 @@ You can create a generator using
 ```python
 generator = FakerGenerator(recognizer.dataset, recognizer.dict_global_entities)
 ```
-To generate new PIIs you can run
+To generate new PII you can run
 
 ```python
 generator.get_faker_generation()
@@ -94,10 +94,8 @@ The method above can generate the following PIIs:
 * ssn
 * country
 
-# Examples
+## Examples
 
-You can find a notebook example in the [notebook](https://github.com/Clearbox-AI/nerpii/tree/main/notebooks) folder
-
-
+You can find a notebook example in the [notebook](https://github.com/Clearbox-AI/nerpii/tree/main/notebooks) folder. 
 
 
