@@ -80,7 +80,7 @@ To generate new PII you can run
 ```python
 generator.get_faker_generation()
 ```
-The method above can generate the following PIIs:
+The method above can generate the following PII:
 * address
 * phone number
 * email naddress
