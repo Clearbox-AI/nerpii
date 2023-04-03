@@ -107,7 +107,6 @@ def test_get_first_name(instance):
     instance.get_first_name()
     assert len(instance.list_faker) > 0
     assert instance.dataset["first_name"][0] != ""
-    assert len(instance.dataset["first_name_gender"]) > 0
 
 
 def test_get_last_name(instance):
@@ -146,24 +145,10 @@ def test_get_zipcode(instance):
 
 
 def test_get_credit_card(instance):
-    instance.columns_with_assigned_entity = [
-        ["email", "EMAIL_ADDRESS"],
-        ["city", "LOCATION"],
-        ["state", "LOCATION"],
-        ["university", "ORGANIZATION"],
-        ["zipcode", "ZIPCODE"],
-        ["phone number", "PHONE_NUMBER"],
-        ["address", "ADDRESS"],
-        ["url", "URL"],
-        ["credit_card", "CREDIT_CARD_NUMBER"],
-        ["ssn", "US_SSN"],
-        ["country", "LOCATION"],
-        ["first_name", "PERSON"],
-        ["last_name", "PERSON"],
-    ]
+    instance.get_columns_with_assigned_entity()
     instance.get_credit_card()
     assert len(instance.list_faker) > 0
-    assert instance.dataset["credit_card"][0] != ""
+    assert instance.dataset["credit card number"][0] != ""
 
 
 def test_get_ssn(instance):

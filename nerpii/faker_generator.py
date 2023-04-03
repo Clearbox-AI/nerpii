@@ -132,8 +132,10 @@ class FakerGenerator:
         ]
 
         for i in phone_number:
-            self.dataset[i] = self.dataset.apply(
-                lambda row: self.faker.phone_number() if not pd.isnull(row) else np.NaN
+            self.dataset[i] = self.dataset[i].apply(
+                lambda row: (
+                    self.faker.phone_number() if not pd.isnull(row) else np.NaN
+                )
             )
 
             self.list_faker.append(i)
@@ -149,8 +151,8 @@ class FakerGenerator:
         ]
 
         for i in email_address:
-            self.dataset[i] = self.dataset.apply(
-                lambda row: self.faker.free_email() if not pd.isnull(row) else np.NaN
+            self.dataset[i] = self.dataset[i].apply(
+                lambda row: (self.faker.free_email() if not pd.isnull(row) else np.NaN)
             )
 
             self.list_faker.append(i)
@@ -235,8 +237,10 @@ class FakerGenerator:
 
         if len(last_name_person) > 0:
             for i in last_name_person:
-                self.dataset[i] = self.dataset.apply(
-                    lambda row: self.faker.last_name() if not pd.isnull(row) else np.NaN
+                self.dataset[i] = self.dataset[i].apply(
+                    lambda row: (
+                        self.faker.last_name() if not pd.isnull(row) else np.NaN
+                    )
                 )
 
                 self.list_faker.append(i)
@@ -248,8 +252,10 @@ class FakerGenerator:
                 if (("last" in i.lower()) and ("name" in i.lower()))
             ]
             for i in last_name_person:
-                self.dataset[i] = self.dataset.apply(
-                    lambda row: self.faker.last_name() if not pd.isnull(row) else np.NaN
+                self.dataset[i] = self.dataset[i].apply(
+                    lambda row: (
+                        self.faker.last_name() if not pd.isnull(row) else np.NaN
+                    )
                 )
 
                 self.list_faker.append(i)
@@ -268,8 +274,8 @@ class FakerGenerator:
         ]
 
         for i in city:
-            self.dataset[i] = self.dataset.apply(
-                lambda row: self.faker.city() if not pd.isnull(row) else np.NaN
+            self.dataset[i] = self.dataset[i].apply(
+                lambda row: (self.faker.city() if not pd.isnull(row) else np.NaN)
             )
 
             self.list_faker.append(i)
@@ -288,13 +294,13 @@ class FakerGenerator:
 
         for i in state:
             if len(self.dataset[i].iloc[0]) == 2:
-                self.dataset[i] = self.dataset.apply(
+                self.dataset[i] = self.dataset[i].apply(
                     lambda row: (
                         self.faker.state_abbr() if not pd.isnull(row) else np.NaN
                     )
                 )
             else:
-                self.dataset[i] = self.dataset.apply(
+                self.dataset[i] = self.dataset[i].apply(
                     lambda row: self.faker.state() if not pd.isnull(row) else np.NaN
                 )
 
@@ -309,8 +315,8 @@ class FakerGenerator:
         url = [i[0] for i in self.columns_with_assigned_entity if i[1] == "URL"]
 
         for i in url:
-            self.dataset[i] = self.dataset.apply(
-                lambda row: self.faker.url() if not pd.isnull(row) else np.NaN
+            self.dataset[i] = self.dataset[i].apply(
+                lambda row: (self.faker.url() if not pd.isnull(row) else np.NaN)
             )
 
             self.list_faker.append(i)
@@ -324,8 +330,8 @@ class FakerGenerator:
         zipcode = [i[0] for i in self.columns_with_assigned_entity if i[1] == "ZIPCODE"]
 
         for i in zipcode:
-            self.dataset[i] = self.dataset.apply(
-                lambda row: self.faker.zipcode() if not pd.isnull(row) else np.NaN
+            self.dataset[i] = self.dataset[i].apply(
+                lambda row: (self.faker.zipcode() if not pd.isnull(row) else np.NaN)
             )
 
             self.list_faker.append(i)
@@ -343,7 +349,7 @@ class FakerGenerator:
         ]
 
         for i in credit_card:
-            self.dataset[i] = self.dataset.apply(
+            self.dataset[i] = self.dataset[i].apply(
                 lambda row: (
                     self.faker.credit_card_number() if not pd.isnull(row) else np.NaN
                 )
@@ -360,8 +366,8 @@ class FakerGenerator:
         ssn = [i[0] for i in self.columns_with_assigned_entity if i[1] == "US_SSN"]
 
         for i in ssn:
-            self.dataset[i] = self.dataset.apply(
-                lambda row: self.faker.ssn() if not pd.isnull(row) else np.NaN
+            self.dataset[i] = self.dataset[i].apply(
+                lambda row: (self.faker.ssn() if not pd.isnull(row) else np.NaN)
             )
 
             self.list_faker.append(i)
@@ -379,8 +385,8 @@ class FakerGenerator:
         ]
 
         for i in country:
-            self.dataset[i] = self.dataset.apply(
-                lambda row: self.faker.country() if not pd.isnull(row) else np.NaN
+            self.dataset[i] = self.dataset[i].apply(
+                lambda row: (self.faker.country() if not pd.isnull(row) else np.NaN)
             )
 
             self.list_faker.append(i)
