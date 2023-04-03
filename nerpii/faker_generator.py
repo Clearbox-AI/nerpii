@@ -220,7 +220,8 @@ class FakerGenerator:
 
             self.list_faker.append(i)
 
-        del self.dataset["first_name_gender"]
+        if "first_name_gender" in self.dataset.columns:
+            del self.dataset["first_name_gender"]
 
     def get_last_name(self) -> None:
         """
