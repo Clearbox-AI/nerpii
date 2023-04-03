@@ -73,7 +73,7 @@ from nerpii.faker_generator import FakerGenerator
 You can create a generator using
 
 ```python
-generator = FakerGenerator(recognizer.dataset, recognizer.dict_global_entities)
+generator = FakerGenerator(dataset, recognizer.dict_global_entities)
 ```
 To generate new PII you can run
 
