@@ -36,6 +36,7 @@ def dataset():
             ],
             "ssn": ["865-50-6891", "042-34-8377", "498-52-4970"],
             "country": ["United Kingdom", "Hungary", "Italy"],
+            "first_name_gender": ["female", "unknown", "male"],
         }
     )
 

@@ -131,7 +131,20 @@ def add_address_entity(additional_addresses: Optional[List] = []) -> PatternReco
     return addresses_recognizer
 
 
-def get_gender(df_input: pd.DataFrame) -> None:
+def get_gender(df_input: pd.DataFrame) -> pd.DataFrame:
+    """Assign gender to each name in dataset
+
+    Parameters
+    ----------
+    df_input : pd.DataFrame
+        A pandas dataframe
+
+
+    Returns
+    -------
+    pd.DataFrame
+        A pandas dataframe with first_name_gender column
+    """
     detector = gender.Detector(case_sensitive=False)
     first_name_gender = []
 
