@@ -1,6 +1,10 @@
 from typing import Any, Dict, List, Optional, Union
 
+import gender_guesser.detector as gender
+import numpy as np
 import pandas as pd
+
+
 from presidio_analyzer import AnalyzerEngine, BatchAnalyzerEngine, PatternRecognizer
 import spacy
 from transformers import AutoModelForTokenClassification, AutoTokenizer, pipeline
@@ -127,6 +131,24 @@ def add_address_entity(additional_addresses: Optional[List] = []) -> PatternReco
     return addresses_recognizer
 
 
+def get_gender(df_input: pd.DataFrame) -> None:
+    detector = gender.Detector(case_sensitive=False)
+    first_name_gender = []
+
+    for column in df_input.columns:
+        if ("first" in column.lower()) and ("name" in column.lower()):
+            for name in df_input[column]:
+                if name is not np.NaN:
+                    first_name_gender.append(detector.get_gender(name))
+                else:
+                    first_name_gender.append("Nan value")
+
+    if len(first_name_gender) > 0:
+        df_input["first_name_gender"] = pd.Series(first_name_gender)
+
+    return df_input
+
+
 class NamedEntityRecognizer:
     """
     A class used to recognize named entities in a dataset.
@@ -161,6 +183,7 @@ class NamedEntityRecognizer:
         _description_
     """
 
+    original_dataset: pd.DataFrame
     dataset: pd.DataFrame
     object_columns: List
     presidio_analyzer: BatchAnalyzerEngine
@@ -196,6 +219,8 @@ class NamedEntityRecognizer:
 
         if not isinstance(df_input, pd.DataFrame):
             df_input = pd.read_csv(df_input)
+
+        df_input = get_gender(df_input)
 
         self.dataset = df_input.sample(n=min(data_sample, df_input.shape[0]))
         self.object_columns = list(self.dataset.select_dtypes(["object"]).columns)
