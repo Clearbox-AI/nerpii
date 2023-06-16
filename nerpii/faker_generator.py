@@ -205,65 +205,66 @@ class FakerGenerator:
             and (("first" in i[0].lower()) and ("name" in i[0].lower()))
         ]
 
-        for i in first_name_person:
-            if self.generation_mark == "*":
-                for row in range(0, len(self.dataset[i])):
-                    if self.dataset[i][row] == self.generation_mark:
-                        if (
-                            self.dataset["first_name_gender"][row] == "female"
-                            or self.dataset["first_name_gender"][row] == "mostly_female"
-                        ):
-                            self.dataset[i] = self.dataset[i].apply(
-                                lambda row: (self.faker.first_name_female())
-                            )
-                        elif (
-                            self.dataset["first_name_gender"][row] == "male"
-                            or self.dataset["first_name_gender"][row] == "mostly_male"
-                        ):
-                            self.dataset[i] = self.dataset[i].apply(
-                                lambda row: (self.faker.first_name_male())
-                            )
-                        elif (
-                            self.dataset["first_name_gender"][row] == "unknown"
-                            or self.dataset["first_name_gender"][row] == "andy"
-                        ):
-                            self.dataset[i] = self.dataset[i].apply(
-                                lambda row: (self.faker.first_name())
-                            )
-                        else:
-                            self.dataset[i][row]
-
-                self.list_faker.append(i)
-            else:
-                for row in range(0, len(self.dataset[i])):
-                    if not pd.isnull(self.dataset[i][row]):
-                        if (
-                            self.dataset["first_name_gender"][row] == "female"
-                            or self.dataset["first_name_gender"][row] == "mostly_female"
-                        ):
-                            self.dataset[i] = self.dataset[i].apply(
-                                lambda row: (self.faker.first_name_female())
-                            )
-                        elif (
-                            self.dataset["first_name_gender"][row] == "male"
-                            or self.dataset["first_name_gender"][row] == "mostly_male"
-                        ):
-                            self.dataset[i] = self.dataset[i].apply(
-                                lambda row: (self.faker.first_name_male())
-                            )
-                        elif (
-                            self.dataset["first_name_gender"][row] == "unknown"
-                            or self.dataset["first_name_gender"][row] == "andy"
-                        ):
-                            self.dataset[i] = self.dataset[i].apply(
-                                lambda row: (self.faker.first_name())
-                            )
-                        else:
-                            self.dataset[i][row] = np.NaN
-
-                self.list_faker.append(i)
-
         if "first_name_gender" in self.dataset.columns:
+            for i in first_name_person:
+                if self.generation_mark == "*":
+                    for row in range(0, len(self.dataset[i])):
+                        if self.dataset[i][row] == self.generation_mark:
+                            if (
+                                self.dataset["first_name_gender"][row] == "female"
+                                or self.dataset["first_name_gender"][row] == "mostly_female"
+                            ):
+                                self.dataset[i] = self.dataset[i].apply(
+                                    lambda row: (self.faker.first_name_female())
+                                )
+                            elif (
+                                self.dataset["first_name_gender"][row] == "male"
+                                or self.dataset["first_name_gender"][row] == "mostly_male"
+                            ):
+                                self.dataset[i] = self.dataset[i].apply(
+                                    lambda row: (self.faker.first_name_male())
+                                )
+                            elif (
+                                self.dataset["first_name_gender"][row] == "unknown"
+                                or self.dataset["first_name_gender"][row] == "andy"
+                            ):
+                                self.dataset[i] = self.dataset[i].apply(
+                                    lambda row: (self.faker.first_name())
+                                )
+                            else:
+                                self.dataset[i][row]
+
+                    self.list_faker.append(i)
+                else:
+                    for row in range(0, len(self.dataset[i])):
+                        if not pd.isnull(self.dataset[i][row]):
+                            if (
+                                self.dataset["first_name_gender"][row] == "female"
+                                or self.dataset["first_name_gender"][row] == "mostly_female"
+                            ):
+                                self.dataset[i] = self.dataset[i].apply(
+                                    lambda row: (self.faker.first_name_female())
+                                )
+                            elif (
+                                self.dataset["first_name_gender"][row] == "male"
+                                or self.dataset["first_name_gender"][row] == "mostly_male"
+                            ):
+                                self.dataset[i] = self.dataset[i].apply(
+                                    lambda row: (self.faker.first_name_male())
+                                )
+                            elif (
+                                self.dataset["first_name_gender"][row] == "unknown"
+                                or self.dataset["first_name_gender"][row] == "andy"
+                            ):
+                                self.dataset[i] = self.dataset[i].apply(
+                                    lambda row: (self.faker.first_name())
+                                )
+                            else:
+                                self.dataset[i][row] = np.NaN
+
+                    self.list_faker.append(i)
+
+        
             del self.dataset["first_name_gender"]
 
     def get_last_name(self) -> None:
