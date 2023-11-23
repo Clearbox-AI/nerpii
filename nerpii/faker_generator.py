@@ -50,7 +50,7 @@ class FakerGenerator:
         self,
         df_input: Union[str, pd.DataFrame],
         dict_global_entities: Dict,
-        lang: str = "en",
+        language: str = "en",
         generation_mark: Optional[str] = None,
     ) -> "FakerGenerator":
         """
@@ -78,14 +78,14 @@ class FakerGenerator:
 
         self.dataset = df_input
         self.dict_global_entities = dict_global_entities
+        self.lang = language
         if self.lang == "it":
-            self.faker = Faker(['it_IT'])
+            self.faker = Faker(["it_IT"])
         else:
             self.faker = Faker()
         self.columns_with_assigned_entity = []
         self.columns_not_synthesized = []
         self.list_faker = []
-        self.lang = lang
         self.generation_mark = generation_mark
 
     def get_columns_with_assigned_entity(self) -> None:
@@ -124,7 +124,7 @@ class FakerGenerator:
         addresses = [
             i[0] for i in self.columns_with_assigned_entity if i[1] == "ADDRESS"
         ]
-        
+
         for i in addresses:
             if self.generation_mark == "*":
                 self.dataset[i] = self.dataset[i].apply(
@@ -220,14 +220,16 @@ class FakerGenerator:
                         if self.dataset[i][row] == self.generation_mark:
                             if (
                                 self.dataset["first_name_gender"][row] == "female"
-                                or self.dataset["first_name_gender"][row] == "mostly_female"
+                                or self.dataset["first_name_gender"][row]
+                                == "mostly_female"
                             ):
                                 self.dataset[i] = self.dataset[i].apply(
                                     lambda row: (self.faker.first_name_female())
                                 )
                             elif (
                                 self.dataset["first_name_gender"][row] == "male"
-                                or self.dataset["first_name_gender"][row] == "mostly_male"
+                                or self.dataset["first_name_gender"][row]
+                                == "mostly_male"
                             ):
                                 self.dataset[i] = self.dataset[i].apply(
                                     lambda row: (self.faker.first_name_male())
@@ -248,14 +250,16 @@ class FakerGenerator:
                         if not pd.isnull(self.dataset[i][row]):
                             if (
                                 self.dataset["first_name_gender"][row] == "female"
-                                or self.dataset["first_name_gender"][row] == "mostly_female"
+                                or self.dataset["first_name_gender"][row]
+                                == "mostly_female"
                             ):
                                 self.dataset[i] = self.dataset[i].apply(
                                     lambda row: (self.faker.first_name_female())
                                 )
                             elif (
                                 self.dataset["first_name_gender"][row] == "male"
-                                or self.dataset["first_name_gender"][row] == "mostly_male"
+                                or self.dataset["first_name_gender"][row]
+                                == "mostly_male"
                             ):
                                 self.dataset[i] = self.dataset[i].apply(
                                     lambda row: (self.faker.first_name_male())
@@ -272,7 +276,6 @@ class FakerGenerator:
 
                     self.list_faker.append(i)
 
-        
             del self.dataset["first_name_gender"]
 
     def get_last_name(self) -> None:
