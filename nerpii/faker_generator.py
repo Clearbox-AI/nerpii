@@ -28,8 +28,8 @@ class FakerGenerator:
         A list of those columns which are not synthesized by faker
     list_faker : List
         A list of those columns which are synthesized by faker
-    spacy_model : Any
-        An english spacy model
+    generation_mark : Any
+        A mark for the generation (usually *)
 
     Returns
     -------
@@ -43,12 +43,14 @@ class FakerGenerator:
     columns_with_assigned_entity: List
     columns_not_synthesized: List
     list_faker: List
+    lang: str
     generation_mark: str
 
     def __init__(
         self,
         df_input: Union[str, pd.DataFrame],
         dict_global_entities: Dict,
+        lang: str = "en",
         generation_mark: Optional[str] = None,
     ) -> "FakerGenerator":
         """
@@ -62,6 +64,8 @@ class FakerGenerator:
             A dictionary whose keys have the same names of the dataframe columns and
             values are dictionaries in which the entity associated to the column and
             its confidence score are reported.
+        lang : str, optional
+            Input language by default "en". Set this parameter to "it" to return better performance on Italian data.
 
         Returns
         -------
@@ -74,10 +78,14 @@ class FakerGenerator:
 
         self.dataset = df_input
         self.dict_global_entities = dict_global_entities
-        self.faker = Faker()
+        if self.lang == "it":
+            self.faker = Faker(['it_IT'])
+        else:
+            self.faker = Faker()
         self.columns_with_assigned_entity = []
         self.columns_not_synthesized = []
         self.list_faker = []
+        self.lang = lang
         self.generation_mark = generation_mark
 
     def get_columns_with_assigned_entity(self) -> None:
@@ -116,7 +124,7 @@ class FakerGenerator:
         addresses = [
             i[0] for i in self.columns_with_assigned_entity if i[1] == "ADDRESS"
         ]
-
+        
         for i in addresses:
             if self.generation_mark == "*":
                 self.dataset[i] = self.dataset[i].apply(
