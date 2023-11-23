@@ -123,7 +123,8 @@ def add_address_entity(additional_addresses: Optional[List] = []) -> PatternReco
         "Avenida",
         "Rambla",
         "Vico",
-        "Strada" "C/",
+        "Strada",
+        "C/",
     ]
     addresses = addresses + additional_addresses
     addresses_recognizer = PatternRecognizer(

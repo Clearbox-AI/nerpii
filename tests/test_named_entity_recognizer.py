@@ -60,6 +60,8 @@ def test_add_address_entity():
         "Plaza",
         "Avenida",
         "Rambla",
+        "Vico",
+        "Strada",
         "C/",
     ]
 
@@ -90,6 +92,8 @@ def test_add_address_entity():
         "Plaza",
         "Avenida",
         "Rambla",
+        "Vico",
+        "Strada",
         "C/",
         "Alley",
         "Court",
@@ -121,6 +125,8 @@ def test_add_address_entity():
         "Plaza",
         "Avenida",
         "Rambla",
+        "Vico",
+        "Strada",
         "C/",
     ]
 
