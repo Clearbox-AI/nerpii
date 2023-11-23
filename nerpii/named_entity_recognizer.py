@@ -123,8 +123,7 @@ def add_address_entity(additional_addresses: Optional[List] = []) -> PatternReco
         "Avenida",
         "Rambla",
         "Vico",
-        "Strada"
-        "C/",
+        "Strada" "C/",
     ]
     addresses = addresses + additional_addresses
     addresses_recognizer = PatternRecognizer(
@@ -215,7 +214,7 @@ class NamedEntityRecognizer:
         df_input: Union[str, pd.DataFrame],
         data_sample: Optional[int] = 500,
         nan_filler: str = "?",
-        lang: str = "en"
+        lang: str = "en",
     ) -> "NamedEntityRecognizer":
         """
         Create a NamedEntityRecognizer instance.
@@ -240,7 +239,7 @@ class NamedEntityRecognizer:
         if not isinstance(df_input, pd.DataFrame):
             df_input = pd.read_csv(df_input)
 
-        #df_input = get_gender(df_input)
+        # df_input = get_gender(df_input)
 
         self.dataset = df_input.sample(n=min(data_sample, df_input.shape[0]))
         self.object_columns = list(self.dataset.select_dtypes(["object"]).columns)
@@ -268,7 +267,6 @@ class NamedEntityRecognizer:
                 spacy.cli.download(it_spacy_model_name)
             self.it_spacy_model = spacy.load(it_spacy_model_name)
 
-
     def set_presidio_analyzer(
         self,
         add_addresses_recognizer: Optional[bool] = True,
@@ -286,31 +284,33 @@ class NamedEntityRecognizer:
         """
 
         if self.lang == "it":
-            configuration = {"nlp_engine_name": "spacy",
-                             "models": [{"lang_code": "it", "model_name": self.it_spacy_model}],}
+            configuration = {
+                "nlp_engine_name": "spacy",
+                "models": [{"lang_code": "it", "model_name": self.it_spacy_model}],
+            }
             provider = NlpEngineProvider(nlp_configuration=configuration)
             nlp_engine_with_italian = provider.create_engine()
 
-            analyzer = AnalyzerEngine(nlp_engine=nlp_engine_with_italian, 
-                                        supported_languages=["it"])
+            analyzer = AnalyzerEngine(
+                nlp_engine=nlp_engine_with_italian, supported_languages=["it"]
+            )
 
             if add_addresses_recognizer:
                 addresses_recognizer = add_address_entity(additional_addresses)
                 analyzer.registry.add_recognizer(addresses_recognizer)
 
             self.presidio_analyzer = BatchAnalyzerEngine(analyzer_engine=analyzer)
-        
+
         else:
             analyzer = AnalyzerEngine()
-            
+
             if add_addresses_recognizer:
                 addresses_recognizer = add_address_entity(additional_addresses)
                 analyzer.registry.add_recognizer(addresses_recognizer)
 
             self.presidio_analyzer = BatchAnalyzerEngine(analyzer_engine=analyzer)
 
-
-    def set_model(self, nlp_model: str) -> None:
+    def set_model(self) -> None:
         """
         Set a pretrained nlp model downloaded from Hugging Face
         (https://huggingface.co/dslim/bert-base-NER) used to recognize ORGANIZATION
@@ -321,7 +321,7 @@ class NamedEntityRecognizer:
         nlp_model : str, optional
             A NLP model name
         """
-        if self.lang == 'it':
+        if self.lang == "it":
             nlp_model = "osiria/bert-italian-uncased-ner"
         else:
             nlp_model = "dslim/bert-base-NER"
@@ -340,7 +340,7 @@ class NamedEntityRecognizer:
         List
             A list containing the results of the analyzer.
         """
-        if self.lang == 'it':
+        if self.lang == "it":
             analyzer_results = list(
                 self.presidio_analyzer.analyze_dict(
                     self.dataset.to_dict(orient="list"), language="it"
@@ -354,7 +354,6 @@ class NamedEntityRecognizer:
                 )
             )
             return analyzer_results
-
 
     def assign_presidio_entities_list(self) -> None:
         """
