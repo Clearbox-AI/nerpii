@@ -21,7 +21,7 @@ class FakerGenerator:
         are dictionaries in which the entity associated to the column and its confidence
         score are reported.
     faker : Any
-        A generator to obtain synthetisized objects
+        A generator to obtain syntheti lang="itsized objects
     columns_with_assigned_entities : List
         A list of columns with an assigned entity
     columns_not_synthesized : List
@@ -50,7 +50,7 @@ class FakerGenerator:
         self,
         df_input: Union[str, pd.DataFrame],
         dict_global_entities: Dict,
-        language: str = "en",
+        lang: str = "en",
         generation_mark: Optional[str] = None,
     ) -> "FakerGenerator":
         """
@@ -78,7 +78,7 @@ class FakerGenerator:
 
         self.dataset = df_input
         self.dict_global_entities = dict_global_entities
-        self.lang = language
+        self.lang = lang
         if self.lang == "it":
             self.faker = Faker(["it_IT"])
         else:
@@ -122,7 +122,14 @@ class FakerGenerator:
         """
 
         addresses = [
-            i[0] for i in self.columns_with_assigned_entity if i[1] == "ADDRESS"
+            i[0]
+            for i in self.columns_with_assigned_entity
+            if i[1] == "ADDRESS"
+            or ("indirizzo" in i[0].lower())
+            or (
+                (i[1] == "LOCATION")
+                and (("address" in i[0].lower()) or (("indirizzo" in i[0].lower())))
+            )
         ]
 
         for i in addresses:
@@ -277,6 +284,16 @@ class FakerGenerator:
                     self.list_faker.append(i)
 
             del self.dataset["first_name_gender"]
+
+        else:
+            for i in first_name_person:
+                self.dataset[i] = self.dataset[i].apply(
+                    lambda row: (
+                        self.faker.first_name() if not pd.isnull(row) else np.NaN
+                    )
+                )
+
+                self.list_faker.append(i)
 
     def get_last_name(self) -> None:
         """
@@ -436,20 +453,42 @@ class FakerGenerator:
 
         zipcode = [i[0] for i in self.columns_with_assigned_entity if i[1] == "ZIPCODE"]
 
-        for i in zipcode:
-            if self.generation_mark == "*":
-                self.dataset[i] = self.dataset[i].apply(
-                    lambda row: (
-                        self.faker.zipcode() if row == self.generation_mark else row
+        if self.lang == "it":
+            for i in zipcode:
+                if self.generation_mark == "*":
+                    self.dataset[i] = self.dataset[i].apply(
+                        lambda row: (
+                            self.faker.postcode()
+                            if row == self.generation_mark
+                            else row
+                        )
                     )
-                )
-                self.list_faker.append(i)
-            else:
-                self.dataset[i] = self.dataset[i].apply(
-                    lambda row: (self.faker.zipcode() if not pd.isnull(row) else np.NaN)
-                )
+                    self.list_faker.append(i)
+                else:
+                    self.dataset[i] = self.dataset[i].apply(
+                        lambda row: (
+                            self.faker.postcode() if not pd.isnull(row) else np.NaN
+                        )
+                    )
 
-                self.list_faker.append(i)
+                    self.list_faker.append(i)
+        else:
+            for i in zipcode:
+                if self.generation_mark == "*":
+                    self.dataset[i] = self.dataset[i].apply(
+                        lambda row: (
+                            self.faker.zipcode() if row == self.generation_mark else row
+                        )
+                    )
+                    self.list_faker.append(i)
+                else:
+                    self.dataset[i] = self.dataset[i].apply(
+                        lambda row: (
+                            self.faker.zipcode() if not pd.isnull(row) else np.NaN
+                        )
+                    )
+
+                    self.list_faker.append(i)
 
     def get_credit_card(self) -> None:
         """

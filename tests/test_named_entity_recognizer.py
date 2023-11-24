@@ -32,7 +32,7 @@ def test_frequency():
     assert frequency(values=[], element=1) == 0
 
 
-def test_add_address_entity():
+def test_en_add_address_entity():
     # Test with default arguments
     recognizer = add_address_entity()
     assert isinstance(recognizer, PatternRecognizer)
@@ -61,7 +61,6 @@ def test_add_address_entity():
         "Avenida",
         "Rambla",
         "Vico",
-        "Strada",
         "C/",
     ]
 
@@ -93,7 +92,6 @@ def test_add_address_entity():
         "Avenida",
         "Rambla",
         "Vico",
-        "Strada",
         "C/",
         "Alley",
         "Court",
@@ -126,7 +124,6 @@ def test_add_address_entity():
         "Avenida",
         "Rambla",
         "Vico",
-        "Strada",
         "C/",
     ]
 

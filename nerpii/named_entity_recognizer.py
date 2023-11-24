@@ -5,7 +5,12 @@ import numpy as np
 import pandas as pd
 
 
-from presidio_analyzer import AnalyzerEngine, BatchAnalyzerEngine, PatternRecognizer
+from presidio_analyzer import (
+    AnalyzerEngine,
+    BatchAnalyzerEngine,
+    PatternRecognizer,
+    RecognizerRegistry,
+)
 from presidio_analyzer.nlp_engine import NlpEngineProvider
 import spacy
 from transformers import AutoModelForTokenClassification, AutoTokenizer, pipeline
@@ -82,7 +87,9 @@ def frequency(values: List, element: Any) -> float:
     return values.count(element) / len(values) if len(values) else 0
 
 
-def add_address_entity(additional_addresses: Optional[List] = []) -> PatternRecognizer:
+def en_add_address_entity(
+    additional_addresses: Optional[List] = [],
+) -> PatternRecognizer:
     """
     Return a customized presidio recognizer that can recognize ADDRESS entity.
     Some address-related words are already set, but user can add others.
@@ -123,15 +130,67 @@ def add_address_entity(additional_addresses: Optional[List] = []) -> PatternReco
         "Avenida",
         "Rambla",
         "Vico",
-        "Strada",
         "C/",
     ]
     addresses = addresses + additional_addresses
-    addresses_recognizer = PatternRecognizer(
-        supported_entity="ADDRESS", deny_list=addresses
+    en_addresses_recognizer = PatternRecognizer(
+        supported_language="en", supported_entity="ADDRESS", deny_list=addresses
     )
 
-    return addresses_recognizer
+    return en_addresses_recognizer
+
+
+def it_add_address_entity(
+    additional_addresses: Optional[List] = [],
+) -> PatternRecognizer:
+    """
+    Return a customized presidio recognizer that can recognize ADDRESS entity.
+    Some address-related words are already set, but user can add others.
+
+    Parameters
+    ----------
+    additional_addresses : Optional[List], optional
+        A list in which user can add new address-related words, by default []
+
+    Returns
+    -------
+    PatternRecognizer
+        A customized presidio recognizer
+    """
+
+    addresses = [
+        "Street",
+        "Rue",
+        "Via",
+        "Square",
+        "Avenue",
+        "Place",
+        "Strada",
+        "St",
+        "Lane",
+        "Road",
+        "Boulevard",
+        "Ln",
+        "Rd",
+        "HighwayDrive",
+        "Av",
+        "Hwy",
+        "Blvd",
+        "Corso",
+        "Piazza",
+        "Calle",
+        "Plaza",
+        "Avenida",
+        "Rambla",
+        "Vico",
+        "C/",
+    ]
+    addresses = addresses + additional_addresses
+    it_addresses_recognizer = PatternRecognizer(
+        supported_language="it", supported_entity="ADDRESS", deny_list=addresses
+    )
+
+    return it_addresses_recognizer
 
 
 def get_gender(df_input: pd.DataFrame) -> pd.DataFrame:
@@ -189,8 +248,10 @@ class NamedEntityRecognizer:
         A dictionary whose keys have the same names of the dataframe columns and values
         are dictionaries in which the entity associated to the column and its confidence
         score are reported.
-    spacy_model : Any
+    en_spacy_model : Any
         An english spacy model
+    it_spacy_model : Any
+        An Italian spacy model
 
 
     Returns
@@ -207,6 +268,7 @@ class NamedEntityRecognizer:
     model: Any
     model_entities: Dict
     dict_global_entities: Dict
+    lang: str
     en_spacy_model: Any
     it_spacy_model: Any
 
@@ -215,7 +277,8 @@ class NamedEntityRecognizer:
         df_input: Union[str, pd.DataFrame],
         data_sample: Optional[int] = 500,
         nan_filler: str = "?",
-        lang: str = "en",
+        lang: Optional[str] = "en",
+        get_gender: Optional[bool] = False,
     ) -> "NamedEntityRecognizer":
         """
         Create a NamedEntityRecognizer instance.
@@ -240,7 +303,8 @@ class NamedEntityRecognizer:
         if not isinstance(df_input, pd.DataFrame):
             df_input = pd.read_csv(df_input)
 
-        # df_input = get_gender(df_input)
+        if get_gender == True:
+            df_input = get_gender(df_input)
 
         self.dataset = df_input.sample(n=min(data_sample, df_input.shape[0]))
         self.object_columns = list(self.dataset.select_dtypes(["object"]).columns)
@@ -287,17 +351,18 @@ class NamedEntityRecognizer:
         if self.lang == "it":
             configuration = {
                 "nlp_engine_name": "spacy",
-                "models": [{"lang_code": "it", "model_name": self.it_spacy_model}],
+                "models": [{"lang_code": "it", "model_name": "it_core_news_lg"}],
             }
             provider = NlpEngineProvider(nlp_configuration=configuration)
             nlp_engine_with_italian = provider.create_engine()
 
             analyzer = AnalyzerEngine(
-                nlp_engine=nlp_engine_with_italian, supported_languages=["it"]
+                nlp_engine=nlp_engine_with_italian,
+                supported_languages=["it"],
             )
 
             if add_addresses_recognizer:
-                addresses_recognizer = add_address_entity(additional_addresses)
+                addresses_recognizer = it_add_address_entity(additional_addresses)
                 analyzer.registry.add_recognizer(addresses_recognizer)
 
             self.presidio_analyzer = BatchAnalyzerEngine(analyzer_engine=analyzer)
@@ -306,7 +371,7 @@ class NamedEntityRecognizer:
             analyzer = AnalyzerEngine()
 
             if add_addresses_recognizer:
-                addresses_recognizer = add_address_entity(additional_addresses)
+                addresses_recognizer = en_add_address_entity(additional_addresses)
                 analyzer.registry.add_recognizer(addresses_recognizer)
 
             self.presidio_analyzer = BatchAnalyzerEngine(analyzer_engine=analyzer)
