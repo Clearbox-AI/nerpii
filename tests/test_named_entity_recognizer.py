@@ -4,7 +4,7 @@ import pytest
 from transformers import AutoModelForTokenClassification, AutoTokenizer, pipeline
 
 from nerpii.named_entity_recognizer import (
-    add_address_entity,
+    en_add_address_entity,
     frequency,
     NamedEntityRecognizer,
     split_name,
