@@ -34,7 +34,7 @@ def test_frequency():
 
 def test_en_add_address_entity():
     # Test with default arguments
-    recognizer = add_address_entity()
+    recognizer = en_add_address_entity()
     assert isinstance(recognizer, PatternRecognizer)
     assert recognizer.deny_list == [
         "Street",
@@ -66,7 +66,7 @@ def test_en_add_address_entity():
 
     # Test with additional addresses
     additional_addresses = ["Alley", "Court"]
-    recognizer = add_address_entity(additional_addresses)
+    recognizer = en_add_address_entity(additional_addresses)
     assert recognizer.deny_list == [
         "Street",
         "Rue",
@@ -98,7 +98,7 @@ def test_en_add_address_entity():
     ]
 
     # Test with empty list as additional_addresses
-    recognizer = add_address_entity([])
+    recognizer = en_add_address_entity([])
     assert recognizer.deny_list == [
         "Street",
         "Rue",
@@ -129,7 +129,7 @@ def test_en_add_address_entity():
 
     # Test with invalid input
     with pytest.raises(TypeError):
-        add_address_entity("Invalid input")
+        en_add_address_entity("Invalid input")
 
 
 @pytest.fixture
