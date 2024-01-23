@@ -21,13 +21,15 @@ class FakerGenerator:
         are dictionaries in which the entity associated to the column and its confidence
         score are reported.
     faker : Any
-        A generator to obtain syntheti lang="itsized objects
+        A generator to obtain synthetisized objects
     columns_with_assigned_entities : List
         A list of columns with an assigned entity
     columns_not_synthesized : List
         A list of those columns which are not synthesized by faker
     list_faker : List
         A list of those columns which are synthesized by faker
+    lang : str
+        A string to set italian as language of generation. Default: en
     generation_mark : Any
         A mark for the generation (usually *)
 
