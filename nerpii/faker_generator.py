@@ -180,39 +180,12 @@ class FakerGenerator:
 
                 self.list_faker.append(i)
 
-    def get_email_address(self) -> None:
-        """
-        Synthesize email address columns in a pandas dataframe
-
-        """
-
-        email_address = [
-            i[0] for i in self.columns_with_assigned_entity if i[1] == "EMAIL_ADDRESS"
-        ]
-
-        for i in email_address:
-            if self.generation_mark == "*":
-                self.dataset[i] = self.dataset[i].apply(
-                    lambda row: (
-                        self.faker.free_email() if row == self.generation_mark else row
-                    )
-                )
-                self.list_faker.append(i)
-            else:
-                self.dataset[i] = self.dataset[i].apply(
-                    lambda row: (
-                        self.faker.free_email() if not pd.isnull(row) else np.NaN
-                    )
-                )
-
-                self.list_faker.append(i)
-
     def get_first_name(self) -> None:
         """
         Synthesize first name columns in a pandas dataframe
 
         """
-
+        first_names = []
         first_name_person = [
             i[0]
             for i in self.columns_with_assigned_entity
@@ -252,6 +225,7 @@ class FakerGenerator:
                                 self.dataset[i][row]
 
                     self.list_faker.append(i)
+                    return list(self.dataset[i])
                 else:
                     for row in range(0, len(self.dataset[i])):
                         if not pd.isnull(self.dataset[i][row]):
@@ -282,6 +256,7 @@ class FakerGenerator:
                                 self.dataset[i][row] = np.NaN
 
                     self.list_faker.append(i)
+                    return list(self.dataset[i])
 
             del self.dataset["first_name_gender"]
 
@@ -294,6 +269,7 @@ class FakerGenerator:
                 )
 
                 self.list_faker.append(i)
+            return list(self.dataset[i])
 
     def get_last_name(self) -> None:
         """
@@ -325,6 +301,8 @@ class FakerGenerator:
 
                     self.list_faker.append(i)
 
+                return list(self.dataset[i])
+
         else:
             last_name_person = [
                 i
@@ -345,6 +323,48 @@ class FakerGenerator:
                     )
 
                     self.list_faker.append(i)
+
+                return list(self.dataset[i])
+
+    def get_email_address(self, names, last_names) -> None:
+        """
+        Synthesize email address columns in a pandas dataframe
+        """
+
+        email_address = [
+            i[0] for i in self.columns_with_assigned_entity if i[1] == "EMAIL_ADDRESS"
+        ]
+
+        for i in email_address:
+            if self.generation_mark == "*":
+                self.dataset[i] = self.dataset.apply(
+                    lambda row: (
+                        names[row.name].lower()
+                        + "."
+                        + last_names[row.name].lower()
+                        + "@"
+                        + self.faker.free_email_domain()
+                        if row == self.generation_mark
+                        else row
+                    ),
+                    axis=1,
+                )
+                self.list_faker.append(i)
+            else:
+                self.dataset[i] = self.dataset.apply(
+                    lambda row: (
+                        names[row.name].lower()
+                        + "."
+                        + last_names[row.name].lower()
+                        + "@"
+                        + self.faker.free_email_domain()
+                        if not pd.isnull(row[i])
+                        else row[i]
+                    ),
+                    axis=1,
+                )
+
+                self.list_faker.append(i)
 
     def get_city(self) -> None:
         """
@@ -605,9 +625,9 @@ class FakerGenerator:
         self.get_columns_with_assigned_entity()
         self.get_address()
         self.get_phone_number()
-        self.get_email_address()
-        self.get_first_name()
-        self.get_last_name()
+        name = self.get_first_name()
+        last_name = self.get_last_name()
+        self.get_email_address(name, last_name)
         self.get_city()
         self.get_state()
         self.get_url()

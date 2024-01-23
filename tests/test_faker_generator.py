@@ -97,10 +97,12 @@ def test_get_phone_number(instance):
 
 
 def test_get_email_address(instance):
+    names = ["Mary", "David", "Emma"]
+    last_names = ["Williams", "Jones", "Clark"]
     instance.get_columns_with_assigned_entity()
-    instance.get_email_address()
-    assert len(instance.list_faker) > 0
-    assert instance.dataset["email"][0] != ""
+    instance.get_email_address(names, last_names)
+    for email in instance.dataset["email"]:
+        assert "@" in email
 
 
 def test_get_first_name(instance):
