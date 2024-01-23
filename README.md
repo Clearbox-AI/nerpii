@@ -75,8 +75,7 @@ You can create a generator using
 ```python
 generator = FakerGenerator(dataset, recognizer.dict_global_entities)
 ```
-If you want to generate Italian PII, add ``` 
-lang = "it"``` as parameter to the previous object.
+If you want to generate Italian PII, add ```lang = "it"``` as parameter to the previous object.
 
 To generate new PII you can run
 
