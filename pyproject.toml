@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "nerpii"
-version = "0.1.5"
+version = "0.1.7"
 description = "A python library to perform NER on structured data and generate PII with Faker"
 authors = ["Clearbox AI <info@clearbox.ai>"]
 license = "GPL"
