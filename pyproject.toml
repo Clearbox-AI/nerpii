@@ -18,6 +18,7 @@ faker = "^17.3.0"
 gender-guesser = "^0.4.0"
 simple-colors = "^0.1.5"
 spacy = "3.5.0"
+torch = {version = "^2.1.0+cpu", source = "pytorch"}
 
 
 [tool.poetry.group.dev.dependencies]
@@ -27,6 +28,12 @@ flake8 = "^6.0.0"
 flake8-import-order = "^0.18.2"
 flake8-black = "^0.3.6"
 black = "^23.1.0"
+
+
+[[tool.poetry.source]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cpu"
+priority = "explicit"
 
 
 [build-system]
