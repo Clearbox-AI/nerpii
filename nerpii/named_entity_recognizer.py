@@ -323,9 +323,10 @@ class NamedEntityRecognizer:
 
         en_spacy_model_name = "en_core_web_lg"
         it_spacy_model_name = "it_core_news_lg"
-        if not spacy.util.is_package(en_spacy_model_name):
-            spacy.cli.download(en_spacy_model_name)
-        self.en_spacy_model = spacy.load(en_spacy_model_name)
+        if self.lang == "en":
+            if not spacy.util.is_package(en_spacy_model_name):
+                spacy.cli.download(en_spacy_model_name)
+            self.en_spacy_model = spacy.load(en_spacy_model_name)
 
         if self.lang == "it":
             if not spacy.util.is_package(it_spacy_model_name):

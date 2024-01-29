@@ -13,7 +13,7 @@ packages = [{include = "nerpii"}]
 python = "^3.9"
 pandas = "^1.5.3"
 presidio-analyzer = "^2.2.32"
-torch = {version = "^2.1.0+cpu", source = "pytorch"}
+torch = "^1.13.1"
 transformers = "^4.26.1"
 faker = "^17.3.0"
 gender-guesser = "^0.4.0"
@@ -27,11 +27,6 @@ flake8 = "^6.0.0"
 flake8-import-order = "^0.18.2"
 flake8-black = "^0.3.6"
 black = "^23.1.0"
-
-[[tool.poetry.source]]
-name = "pytorch"
-url = "https://download.pytorch.org/whl/cpu"
-priority = "explicit"
 
 [build-system]
 requires = ["poetry-core"]
