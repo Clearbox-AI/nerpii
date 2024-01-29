@@ -13,7 +13,14 @@ from presidio_analyzer import (
 )
 from presidio_analyzer.nlp_engine import NlpEngineProvider
 import spacy
-from transformers import AutoModelForTokenClassification, AutoTokenizer, pipeline
+from transformers import (
+    AutoModelForTokenClassification,
+    AutoTokenizer,
+    logging,
+    pipeline,
+)
+
+logging.set_verbosity_error()
 
 
 # è importante eseguire prima assign_entities_with_presidio, poi
