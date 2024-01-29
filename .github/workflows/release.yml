@@ -14,3 +14,4 @@ jobs:
     - run: pip install poetry==1.6.1
     - run: poetry build
     - run: poetry publish --username=__token__ --password=${{ secrets.PYPI_TOKEN }}
+    - run: twine upload dist/*

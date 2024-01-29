@@ -28,6 +28,7 @@ flake8 = "^6.0.0"
 flake8-import-order = "^0.18.2"
 flake8-black = "^0.3.6"
 black = "^23.1.0"
+twine = "^4.0.2"
 
 
 [[tool.poetry.source]]
