@@ -18,7 +18,7 @@ faker = "^17.3.0"
 gender-guesser = "^0.4.0"
 simple-colors = "^0.1.5"
 spacy = "3.5.0"
-torch = "^1.13.1"
+torch = ">=1.13.1"
 
 
 [tool.poetry.group.dev.dependencies]
