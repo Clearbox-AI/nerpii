@@ -18,8 +18,10 @@ from nerpii.named_entity_recognizer import NamedEntityRecognizer
 You can create a recognizer passing as parameter a path to a csv file or a Pandas Dataframe
 
 ```python
-recognizer = NamedEntityRecognizer('./csv_path.csv')
+recognizer = NamedEntityRecognizer('./csv_path.csv', lang)
 ```
+The <strong>lang</strong> parameter is used to define the language of the dataset. The deafult value is <strong>en</strong> (english), but it can be also selelcted <strong>it</strong> (italian).
+
 Please note that if there are columns in the dataset containing names of people consisting of first and last names (e.g. John Smith), before creating a recognizer, it is necessary to split the name into two different columns called <strong>first_name</strong> and <strong>last_name</strong> using the function `split_name()`.
 
 ```python
@@ -75,7 +77,7 @@ You can create a generator using
 ```python
 generator = FakerGenerator(dataset, recognizer.dict_global_entities)
 ```
-If you want to generate Italian PII, add ```lang = "it"``` as parameter to the previous object.
+If you want to generate Italian PII, add ```lang = "it"``` as parameter to the previous object (default: ```lang = "en"```)
 
 To generate new PII you can run
 
