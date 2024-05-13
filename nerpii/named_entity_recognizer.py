@@ -285,7 +285,7 @@ class NamedEntityRecognizer:
         data_sample: Optional[int] = 500,
         nan_filler: str = "?",
         lang: Optional[str] = "en",
-        get_gender: Optional[bool] = False,
+        get_gender_option: Optional[bool] = False,
     ) -> "NamedEntityRecognizer":
         """
         Create a NamedEntityRecognizer instance.
@@ -310,7 +310,7 @@ class NamedEntityRecognizer:
         if not isinstance(df_input, pd.DataFrame):
             df_input = pd.read_csv(df_input)
 
-        if get_gender == True:
+        if get_gender_option == True:
             df_input = get_gender(df_input)
 
         self.dataset = df_input.sample(n=min(data_sample, df_input.shape[0]))
