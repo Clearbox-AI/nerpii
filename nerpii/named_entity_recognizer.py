@@ -3,13 +3,10 @@ import warnings
 
 import gender_guesser.detector as gender
 import pandas as pd
-
-
 from presidio_analyzer import (
     AnalyzerEngine,
     BatchAnalyzerEngine,
     PatternRecognizer,
-    RecognizerRegistry,
 )
 from presidio_analyzer.nlp_engine import NlpEngineProvider
 from transformers import (

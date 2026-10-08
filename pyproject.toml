@@ -23,10 +23,10 @@ torch = ">=2.2"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.29"
-pytest = "^8.3"
+pytest = "^9.0.3"
 flake8 = "^7.1"
-flake8-import-order = "^0.18.2"
-flake8-black = "^0.3.6"
+flake8-import-order = "^0.19.2"
+flake8-black = "^0.4.0"
 black = ">=24.8"
 
 [build-system]

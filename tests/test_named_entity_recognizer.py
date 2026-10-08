@@ -106,7 +106,7 @@ def test_split_name_with_invalid_input():
 
 
 def test__init__(instance):
-    assert type(instance.dataset) is str or pd.DataFrame
+    assert isinstance(instance.dataset, pd.DataFrame)
     assert instance.dataset.loc[:, instance.object_columns].isna().values.any() == False
 
     with pytest.raises(ValueError):

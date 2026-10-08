@@ -5,6 +5,8 @@ on:
   push:
     branches: [main, develop]
   pull_request:
+  # Lets the release workflow run the tests before publishing
+  workflow_call:
 
 jobs:
   tests:
@@ -65,6 +67,8 @@ jobs:
       # pyproject.toml and makes that if you add things like console-scripts at some point that
       # they'll be installed and working.
       - run: poetry install --no-interaction
+
+      - run: poetry run flake8 nerpii tests
 
       # And finally run tests. I'm using pytest and all my pytest config is in my `pyproject.toml`
       # so this line is super-simple. But it could be as complex as you need.
