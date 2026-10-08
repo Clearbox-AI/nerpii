@@ -329,3 +329,91 @@ def test_generation_mark_with_nullable_dtype():
     assert generator.dataset["city"][0] != "*"
     assert pd.isna(generator.dataset["city"][1])
     assert generator.dataset["city"][2] == "Rome"
+
+
+def location_frame(city, state, country, zipcode, rows=20):
+    return pd.DataFrame(
+        {
+            "city": [city] * rows,
+            "state": [state] * rows,
+            "state_code": [state] * rows,
+            "country": [country] * rows,
+            "zip": [zipcode] * rows,
+        }
+    )
+
+
+LOCATION_ENTITIES = entities(
+    city="LOCATION",
+    state="LOCATION",
+    state_code="LOCATION",
+    country="LOCATION",
+    zip="ZIPCODE",
+)
+
+
+def address_provider(generator):
+    return generator.faker.provider("faker.providers.address")
+
+
+def test_us_state_names_match_abbreviations():
+    generator = FakerGenerator(pd.DataFrame(), {})
+    pairs = {(p["state"], p["state_abbr"]) for p in generator._locale_places()}
+    assert len(pairs) == 50
+    for pair in [
+        ("Maine", "ME"),
+        ("Maryland", "MD"),
+        ("Massachusetts", "MA"),
+        ("Michigan", "MI"),
+        ("Mississippi", "MS"),
+        ("Missouri", "MO"),
+        ("Montana", "MT"),
+        ("Texas", "TX"),
+        ("Wyoming", "WY"),
+    ]:
+        assert pair in pairs
+
+
+def test_locations_are_consistent_in_english():
+    df = location_frame("Milan", "Texas", "Hungary", "10145")
+    df["state_code"] = "TX"
+    generator = FakerGenerator(df, LOCATION_ENTITIES)
+    result = generator.get_faker_generation()
+    pairs = {(p["state"], p["state_abbr"]) for p in generator._locale_places()}
+    zip_ranges = address_provider(generator).states_postcode
+    for _, row in result.iterrows():
+        assert (row["state"], row["state_code"]) in pairs
+        low, high = zip_ranges[row["state_code"]]
+        assert low <= int(row["zip"]) <= high
+        assert row["country"] == "United States"
+
+
+def test_locations_are_consistent_in_italian():
+    df = location_frame("Milano", "Milano", "Italia", "20100")
+    df["state_code"] = "MI"
+    generator = FakerGenerator(df, LOCATION_ENTITIES, lang="it")
+    result = generator.get_faker_generation()
+    address = address_provider(generator)
+    provinces = dict(zip(address.states, address.states_abbr))
+    for _, row in result.iterrows():
+        assert provinces[row["state"]] == row["state_code"]
+        assert [row["city"], row["state_code"]] in address.cap_city_province[row["zip"]]
+        assert row["country"] == "Italy"
+
+
+def test_locations_are_consistent_across_separate_calls():
+    df = location_frame("Milano", "Milano", "Italia", "20100")
+    generator = FakerGenerator(df, LOCATION_ENTITIES, lang="it")
+    generator.get_columns_with_assigned_entity()
+    generator.get_city()
+    generator.get_zipcode()
+    table = address_provider(generator).cap_city_province
+    for city, zipcode in zip(generator.dataset["city"], generator.dataset["zip"]):
+        assert any(place[0] == city for place in table[zipcode])
+
+
+def test_country_codes_stay_codes():
+    df = pd.DataFrame({"country": ["HU", "GB"]})
+    generator = FakerGenerator(df, entities(country="LOCATION"), lang="it")
+    generator.get_faker_generation()
+    assert list(generator.dataset["country"]) == ["IT", "IT"]

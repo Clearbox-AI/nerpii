@@ -107,6 +107,8 @@ The method above can generate the following PII:
 * ssn
 * country
 
+City, state, zipcode and country are generated together for each row, so they are consistent with each other. They come from the generator's locale: the country is always United States (or Italy with `lang = "it"`), and for Italian data the state is the province.
+
 ## Examples
 
 You can find a notebook example in the [notebook](https://github.com/Clearbox-AI/nerpii/tree/main/notebooks) folder. 
