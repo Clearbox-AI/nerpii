@@ -5,7 +5,6 @@ from faker import Faker
 
 import numpy as np
 import pandas as pd
-from simple_colors import green, red
 
 
 class FakerGenerator:
@@ -147,7 +146,7 @@ class FakerGenerator:
             else:
                 self.dataset[i] = self.dataset[i].apply(
                     lambda row: (
-                        self.faker.street_address() if not pd.isnull(row) else np.NaN
+                        self.faker.street_address() if not pd.isnull(row) else np.nan
                     )
                 )
 
@@ -176,7 +175,7 @@ class FakerGenerator:
             else:
                 self.dataset[i] = self.dataset[i].apply(
                     lambda row: (
-                        self.faker.phone_number() if not pd.isnull(row) else np.NaN
+                        self.faker.phone_number() if not pd.isnull(row) else np.nan
                     )
                 )
 
@@ -255,7 +254,7 @@ class FakerGenerator:
                                     lambda row: (self.faker.first_name())
                                 )
                             else:
-                                self.dataset[i][row] = np.NaN
+                                self.dataset[i][row] = np.nan
 
                     self.list_faker.append(i)
                     return list(self.dataset[i])
@@ -266,7 +265,7 @@ class FakerGenerator:
             for i in first_name_person:
                 self.dataset[i] = self.dataset[i].apply(
                     lambda row: (
-                        self.faker.first_name() if not pd.isnull(row) else np.NaN
+                        self.faker.first_name() if not pd.isnull(row) else np.nan
                     )
                 )
 
@@ -297,7 +296,7 @@ class FakerGenerator:
                 else:
                     self.dataset[i] = self.dataset[i].apply(
                         lambda row: (
-                            self.faker.last_name() if not pd.isnull(row) else np.NaN
+                            self.faker.last_name() if not pd.isnull(row) else np.nan
                         )
                     )
 
@@ -320,7 +319,7 @@ class FakerGenerator:
                 else:
                     self.dataset[i] = self.dataset[i].apply(
                         lambda row: (
-                            self.faker.last_name() if not pd.isnull(row) else np.NaN
+                            self.faker.last_name() if not pd.isnull(row) else np.nan
                         )
                     )
 
@@ -391,7 +390,7 @@ class FakerGenerator:
                 self.list_faker.append(i)
             else:
                 self.dataset[i] = self.dataset[i].apply(
-                    lambda row: (self.faker.city() if not pd.isnull(row) else np.NaN)
+                    lambda row: (self.faker.city() if not pd.isnull(row) else np.nan)
                 )
 
                 self.list_faker.append(i)
@@ -422,7 +421,7 @@ class FakerGenerator:
                 else:
                     self.dataset[i] = self.dataset[i].apply(
                         lambda row: (
-                            self.faker.state_abbr() if not pd.isnull(row) else np.NaN
+                            self.faker.state_abbr() if not pd.isnull(row) else np.nan
                         )
                     )
 
@@ -438,7 +437,7 @@ class FakerGenerator:
                 else:
                     self.dataset[i] = self.dataset[i].apply(
                         lambda row: (
-                            self.faker.state() if not pd.isnull(row) else np.NaN
+                            self.faker.state() if not pd.isnull(row) else np.nan
                         )
                     )
 
@@ -462,7 +461,7 @@ class FakerGenerator:
                 self.list_faker.append(i)
             else:
                 self.dataset[i] = self.dataset[i].apply(
-                    lambda row: (self.faker.url() if not pd.isnull(row) else np.NaN)
+                    lambda row: (self.faker.url() if not pd.isnull(row) else np.nan)
                 )
 
                 self.list_faker.append(i)
@@ -489,7 +488,7 @@ class FakerGenerator:
                 else:
                     self.dataset[i] = self.dataset[i].apply(
                         lambda row: (
-                            self.faker.postcode() if not pd.isnull(row) else np.NaN
+                            self.faker.postcode() if not pd.isnull(row) else np.nan
                         )
                     )
 
@@ -506,7 +505,7 @@ class FakerGenerator:
                 else:
                     self.dataset[i] = self.dataset[i].apply(
                         lambda row: (
-                            self.faker.zipcode() if not pd.isnull(row) else np.NaN
+                            self.faker.zipcode() if not pd.isnull(row) else np.nan
                         )
                     )
 
@@ -539,7 +538,7 @@ class FakerGenerator:
                     lambda row: (
                         self.faker.credit_card_number()
                         if not pd.isnull(row)
-                        else np.NaN
+                        else np.nan
                     )
                 )
 
@@ -563,7 +562,7 @@ class FakerGenerator:
                 self.list_faker.append(i)
             else:
                 self.dataset[i] = self.dataset[i].apply(
-                    lambda row: (self.faker.ssn() if not pd.isnull(row) else np.NaN)
+                    lambda row: (self.faker.ssn() if not pd.isnull(row) else np.nan)
                 )
 
                 self.list_faker.append(i)
@@ -590,7 +589,7 @@ class FakerGenerator:
                 self.list_faker.append(i)
             else:
                 self.dataset[i] = self.dataset[i].apply(
-                    lambda row: (self.faker.country() if not pd.isnull(row) else np.NaN)
+                    lambda row: (self.faker.country() if not pd.isnull(row) else np.nan)
                 )
 
                 self.list_faker.append(i)
@@ -612,11 +611,11 @@ class FakerGenerator:
         """
 
         for col in self.list_faker:
-            message = "Column " + green(col, "bold") + " synthesized with Faker."
+            message = "Column " + col + " synthesized with Faker."
             print(message)
 
         for col in self.columns_not_synthesized:
-            message = "Column " + red(col[0], "bold") + " not synthesized with Faker."
+            message = "Column " + col[0] + " not synthesized with Faker."
             print(message)
 
     def get_faker_generation(self) -> None:

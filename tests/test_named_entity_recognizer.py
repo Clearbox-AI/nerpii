@@ -210,9 +210,17 @@ def test_assign_presidio_entity_list(instance):
         "state": ["LOCATION", "LOCATION", "LOCATION"],
         "university": None,
         "person": ["PERSON", "PERSON"],
-        "zipcode": None,
+        # Presidio tags 5-digit zipcodes as dates; assign_entities_manually then
+        # assigns ZIPCODE from the column name
+        "zipcode": ["DATE_TIME", "DATE_TIME"],
     }
-    assert instance.assigned_entities_cols == ["email", "city", "state", "person"]
+    assert instance.assigned_entities_cols == [
+        "email",
+        "city",
+        "state",
+        "person",
+        "zipcode",
+    ]
 
 
 def test_assign_location_entity(instance):
@@ -226,7 +234,7 @@ def test_assign_location_entity(instance):
         "state": {"entity": "LOCATION", "confidence_score": 1.0},
         "university": None,
         "person": ["PERSON", "PERSON"],
-        "zipcode": None,
+        "zipcode": ["DATE_TIME", "DATE_TIME"],
     }
 
 
@@ -261,7 +269,7 @@ def test_assign_entities_and_score(instance):
         "state": {"entity": "LOCATION", "confidence_score": 1.0},
         "university": None,
         "person": {"entity": "PERSON", "confidence_score": 1.0},
-        "zipcode": None,
+        "zipcode": {"entity": "DATE_TIME", "confidence_score": 1.0},
     }
 
 

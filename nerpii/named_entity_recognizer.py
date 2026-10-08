@@ -1,7 +1,6 @@
 from typing import Any, Dict, List, Optional, Union
 
 import gender_guesser.detector as gender
-import numpy as np
 import pandas as pd
 
 
@@ -220,7 +219,7 @@ def get_gender(df_input: pd.DataFrame) -> pd.DataFrame:
     for column in df_input.columns:
         if ("first" in column.lower()) and ("name" in column.lower()):
             for name in df_input[column]:
-                if name is not np.NaN:
+                if pd.notna(name):
                     first_name_gender.append(detector.get_gender(name))
                 else:
                     first_name_gender.append("Nan value")
@@ -314,7 +313,10 @@ class NamedEntityRecognizer:
             df_input = get_gender(df_input)
 
         self.dataset = df_input.sample(n=min(data_sample, df_input.shape[0]))
-        self.object_columns = list(self.dataset.select_dtypes(["object"]).columns)
+        # "string" picks up pandas 3's default str dtype for text columns
+        self.object_columns = list(
+            self.dataset.select_dtypes(["object", "string"]).columns
+        )
         # fill NaN values for object columns
         self.dataset.loc[:, self.object_columns] = self.dataset.loc[
             :, self.object_columns

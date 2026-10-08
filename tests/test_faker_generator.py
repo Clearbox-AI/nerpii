@@ -22,7 +22,7 @@ def dataset():
             ],
             "person": ["George Bush", None, "Hillary Clinton"],
             "zipcode": ["10145", "N11RG", "56178"],
-            "phone number": ["5678-0987", "1234-4321", "0987-1234"],
+            "phone number": ["212-555-0187", "(415) 555-0132", "312-555-0199"],
             "address": [
                 "Piazza Gae Aulenti 45",
                 "171 Upper Street",
