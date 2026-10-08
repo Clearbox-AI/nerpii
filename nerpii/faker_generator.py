@@ -57,6 +57,10 @@ class FakerGenerator:
     generation_mark : Any
         If set, only cells equal to this value (e.g. "*") are synthesized.
         If None, every non-null cell of a synthesized column is replaced.
+
+    City, state, zipcode and country columns are generated from a single location per
+    row, taken from the generator's locale, so that they are consistent with each
+    other: the country is always the locale's country (United States or Italy).
     """
 
     dataset: pd.DataFrame
@@ -113,6 +117,8 @@ class FakerGenerator:
         self.columns_not_synthesized = []
         self.list_faker = []
         self.generation_mark = generation_mark
+        self._row_locations = {}
+        self._places = None
 
     def _columns_with_entity(
         self, entity: str, name_filter: Callable[[str], bool] = lambda column: True
@@ -149,6 +155,68 @@ class FakerGenerator:
         self.dataset[column] = values
         if column not in self.list_faker:
             self.list_faker.append(column)
+
+    def _locale_places(self) -> List[Dict[str, str]]:
+        """
+        Return the places of the generator's locale as dictionaries with consistent
+        city (None if the locale has no list of real cities), state, state_abbr and
+        zipcode (None if it has to be generated from the state).
+        """
+        if self._places is None:
+            address = self.faker.provider("faker.providers.address")
+            if self.lang == "it":
+                provinces = dict(zip(address.states_abbr, address.states, strict=True))
+                # Skip provinces missing from the list of states (abolished ones)
+                self._places = [
+                    {
+                        "city": city,
+                        "state": provinces[province],
+                        "state_abbr": province,
+                        "zipcode": zipcode,
+                    }
+                    for zipcode, places in address.cap_city_province.items()
+                    for city, province in places
+                    if province in provinces
+                ]
+            else:
+                # states_abbr also lists DC, which is not in states
+                abbreviations = [abbr for abbr in address.states_abbr if abbr != "DC"]
+                self._places = [
+                    {"city": None, "state": state, "state_abbr": abbr, "zipcode": None}
+                    for state, abbr in zip(address.states, abbreviations, strict=True)
+                ]
+        return self._places
+
+    def _location(self, position: int) -> Dict[str, str]:
+        """
+        Return the location of a row: a city, state, zipcode and country that belong
+        together. The same row always gets the same location.
+        """
+        if position not in self._row_locations:
+            location = dict(self.faker.random_element(self._locale_places()))
+            if location["city"] is None:
+                location["city"] = self.faker.city()
+            if location["zipcode"] is None:
+                location["zipcode"] = self.faker.zipcode_in_state(
+                    location["state_abbr"]
+                )
+            location["country"] = self.faker.current_country()
+            location["country_code"] = self.faker.current_country_code()
+            self._row_locations[position] = location
+        return self._row_locations[position]
+
+    def _synthesize_location(self, column: str, field: str) -> None:
+        """
+        Replace the cells of a column with a field of the rows' locations.
+        """
+        self._synthesize(column, lambda position: self._location(position)[field])
+
+    def _is_abbreviated(self, column: str) -> bool:
+        """
+        Whether the first non-null value of a column is two characters long.
+        """
+        values = self.dataset[column].dropna()
+        return len(values) > 0 and len(str(values.iloc[0])) == 2
 
     def get_columns_with_assigned_entity(self) -> None:
         """
@@ -311,12 +379,13 @@ class FakerGenerator:
             lambda column: "city" in column.lower() or "cities" in column.lower(),
         )
         for column in cities:
-            self._synthesize(column, lambda _: self.faker.city())
+            self._synthesize_location(column, "city")
 
     def get_state(self) -> None:
         """
         Synthesize state columns in a pandas dataframe. States are abbreviated if
-        the first value of the column is two characters long.
+        the first value of the column is two characters long. Italian states are
+        provinces.
 
         """
 
@@ -324,11 +393,10 @@ class FakerGenerator:
             "LOCATION", lambda column: "state" in column.lower()
         )
         for column in states:
-            values = self.dataset[column].dropna()
-            if len(values) > 0 and len(str(values.iloc[0])) == 2:
-                self._synthesize(column, lambda _: self.faker.state_abbr())
+            if self._is_abbreviated(column):
+                self._synthesize_location(column, "state_abbr")
             else:
-                self._synthesize(column, lambda _: self.faker.state())
+                self._synthesize_location(column, "state")
 
     def get_url(self) -> None:
         """
@@ -345,13 +413,8 @@ class FakerGenerator:
 
         """
 
-        if self.lang == "it":
-            make_zipcode = self.faker.postcode
-        else:
-            make_zipcode = self.faker.zipcode
-
         for column in self._columns_with_entity("ZIPCODE"):
-            self._synthesize(column, lambda _: make_zipcode())
+            self._synthesize_location(column, "zipcode")
 
     def get_credit_card(self) -> None:
         """
@@ -373,7 +436,9 @@ class FakerGenerator:
 
     def get_country(self) -> None:
         """
-        Synthesize country columns in a pandas dataframe
+        Synthesize country columns in a pandas dataframe with the locale's country.
+        Countries are written as two-letter codes if the first value of the column is
+        two characters long.
 
         """
 
@@ -381,7 +446,10 @@ class FakerGenerator:
             "LOCATION", lambda column: "country" in column.lower()
         )
         for column in countries:
-            self._synthesize(column, lambda _: self.faker.country())
+            if self._is_abbreviated(column):
+                self._synthesize_location(column, "country_code")
+            else:
+                self._synthesize_location(column, "country")
 
     def get_columns_not_synthesized(self) -> None:
         """
