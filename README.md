@@ -4,7 +4,7 @@ Nerpii is a Python library developed to perform Named Entity Recognition (NER) o
 NER is performed with [Presidio](https://github.com/microsoft/presidio) and with a [NLP model](https://huggingface.co/dslim/bert-base-NER) available on HuggingFace, while the PII generation is based on [Faker](https://faker.readthedocs.io/en/master/).
 
 ## Installation
-You can install Nerpii by using pip: 
+Nerpii requires Python 3.10 or later. You can install it by using pip:
 
 ```python
 pip install nerpii
@@ -82,7 +82,14 @@ If you want to generate Italian PII, add ```lang = "it"``` as parameter to the p
 To generate new PII you can run
 
 ```python
-generator.get_faker_generation()
+synthetic_dataset = generator.get_faker_generation()
+```
+The generator works on a copy of the dataset, so the original dataframe is left unchanged. The synthesized dataframe is returned and is also available as `generator.dataset`.
+
+By default every non-null value of a recognized column is replaced. To replace only some values, mark them in the dataset (e.g. with `*`) and pass the mark as `generation_mark`:
+
+```python
+generator = FakerGenerator(dataset, recognizer.dict_global_entities, generation_mark="*")
 ```
 The method above can generate the following PII:
 * address
