@@ -1,4 +1,5 @@
 from typing import Any, Dict, List, Optional, Union
+import warnings
 
 import gender_guesser.detector as gender
 import pandas as pd
@@ -18,6 +19,8 @@ from transformers import (
     pipeline,
 )
 
+from nerpii.faker_generator import GENDER_COLUMN, is_first_name_column
+
 logging.set_verbosity_error()
 
 
@@ -27,13 +30,17 @@ logging.set_verbosity_error()
 
 def split_name(df_input: Union[str, pd.DataFrame], name_of_column: str) -> pd.DataFrame:
     """
-    Return a pandas dataframe where a given column with person's name is splitted into
-    two columns: first_name and last_name
+    Return a copy of a dataframe where a column with people's full names is replaced
+    by first_name and last_name columns.
+
+    The first word of each name becomes the first name and the rest becomes the last
+    name, so "Alexis R. Graves" gives "Alexis" and "R. Graves". A single word gives a
+    first name and a missing last name, and missing names stay missing.
 
     Parameters
     ----------
-    df_input : pd.DataFrame
-        A pandas dataframe
+    df_input : Union[str, pd.DataFrame]
+        A pandas dataframe or a path to a csv file. A dataframe is not modified.
     name_of_column : str
         name of the column which contains names that have to be splitted
 
@@ -43,34 +50,16 @@ def split_name(df_input: Union[str, pd.DataFrame], name_of_column: str) -> pd.Da
         A pandas dataframe with first_name and last_name columns
     """
 
-    if not isinstance(df_input, pd.DataFrame):
+    if isinstance(df_input, pd.DataFrame):
+        df_input = df_input.copy()
+    else:
         df_input = pd.read_csv(df_input)
 
-    column = df_input[name_of_column]
+    names = df_input[name_of_column].astype("string").str.strip().str.split(n=1)
+    df_input["first_name"] = names.str[0]
+    df_input["last_name"] = names.str[1]
 
-    if column.isna().any():
-        column.fillna("- -", inplace=True)
-
-    list_name = []
-    for i in column:
-        list_name.append(i.split())
-
-    for i in list_name:
-        if len(i) < 2:
-            i.append("-")
-
-    name = []
-    last_name = []
-    for i in list_name:
-        name.append(i[0])
-        last_name.append(i[1])
-
-    df_input["first_name"] = pd.Series(name)
-    df_input["last_name"] = pd.Series(last_name)
-
-    df_input = df_input.drop(name_of_column, axis=1)
-
-    return df_input
+    return df_input.drop(columns=name_of_column)
 
 
 def frequency(values: List, element: Any) -> float:
@@ -199,32 +188,35 @@ def it_add_address_entity(
 
 
 def get_gender(df_input: pd.DataFrame) -> pd.DataFrame:
-    """Assign gender to each name in dataset
+    """
+    Return a copy of a dataframe with a first_name_gender column, guessed from its
+    first first-name column.
+
+    Pass the result to FakerGenerator to generate first names of the same gender as
+    the original ones. The generator drops the column from its output.
 
     Parameters
     ----------
     df_input : pd.DataFrame
-        A pandas dataframe
-
+        A pandas dataframe. It is not modified.
 
     Returns
     -------
     pd.DataFrame
-        A pandas dataframe with first_name_gender column
+        A pandas dataframe with first_name_gender column, if it has a first-name
+        column
     """
+    df_input = df_input.copy()
+    first_names = [
+        column for column in df_input.columns if is_first_name_column(column)
+    ]
+    if not first_names:
+        return df_input
+
     detector = gender.Detector(case_sensitive=False)
-    first_name_gender = []
-
-    for column in df_input.columns:
-        if ("first" in column.lower()) and ("name" in column.lower()):
-            for name in df_input[column]:
-                if pd.notna(name):
-                    first_name_gender.append(detector.get_gender(name))
-                else:
-                    first_name_gender.append("Nan value")
-
-    if len(first_name_gender) > 0:
-        df_input["first_name_gender"] = pd.Series(first_name_gender)
+    df_input[GENDER_COLUMN] = df_input[first_names[0]].map(
+        lambda name: detector.get_gender(str(name)) if pd.notna(name) else "Nan value"
+    )
 
     return df_input
 
@@ -292,8 +284,7 @@ class NamedEntityRecognizer:
             Input language by default "en". Set this parameter to "it" to return
             better performance on Italian data.
         get_gender_option : Optional[bool], optional
-            Whether to add a first_name_gender column guessed from first name columns,
-            by default False
+            Deprecated and ignored, use get_gender() instead. By default False
         random_state : Optional[int], optional
             Seed for sampling the rows, by default None
 
@@ -306,8 +297,14 @@ class NamedEntityRecognizer:
         if not isinstance(df_input, pd.DataFrame):
             df_input = pd.read_csv(df_input)
 
-        if get_gender_option == True:
-            df_input = get_gender(df_input)
+        if get_gender_option:
+            warnings.warn(
+                "get_gender_option no longer adds a first_name_gender column to your "
+                "dataframe and will be removed. Call get_gender() on the dataframe and "
+                "pass the result to FakerGenerator instead.",
+                FutureWarning,
+                stacklevel=2,
+            )
 
         self.dataset = df_input.sample(
             n=min(data_sample, df_input.shape[0]), random_state=random_state

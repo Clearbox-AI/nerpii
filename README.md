@@ -31,6 +31,8 @@ from nerpii.named_entity_recognizer import split_name
 
 df = split_name('./csv_path.csv', name_of_column_to_split)
 ```
+The first word of each name becomes the first name and the rest becomes the last name (e.g. Alexis R. Graves gives Alexis and R. Graves). Missing names stay missing, and the dataframe you pass in is not modified.
+
 The NamedEntityRecognizer class contains three methods to perform NER on a dataset:
 
 ```python
@@ -80,6 +82,15 @@ You can create a generator using
 generator = FakerGenerator(dataset, recognizer.dict_global_entities)
 ```
 If you want to generate Italian PII, add ```lang = "it"``` as parameter to the previous object (default: ```lang = "en"```)
+
+To generate first names of the same gender as the original ones, add a gender column with `get_gender()` before creating the generator. The generator drops the column from its output.
+
+```python
+from nerpii.named_entity_recognizer import get_gender
+
+dataset = get_gender(dataset)
+generator = FakerGenerator(dataset, recognizer.dict_global_entities)
+```
 
 To generate new PII you can run
 

@@ -8,6 +8,7 @@ from transformers import AutoModelForTokenClassification, AutoTokenizer, pipelin
 from nerpii.named_entity_recognizer import (
     en_add_address_entity,
     frequency,
+    get_gender,
     NamedEntityRecognizer,
     split_name,
 )
@@ -163,8 +164,8 @@ def test_split_name_with_dataframe(dataset):
     assert "last_name" in result.columns
     assert result.iloc[0]["first_name"] == "George"
     assert result.iloc[0]["last_name"] == "Bush"
-    assert result.iloc[1]["first_name"] == "-"
-    assert result.iloc[1]["last_name"] == "-"
+    assert pd.isna(result.iloc[1]["first_name"])
+    assert pd.isna(result.iloc[1]["last_name"])
     assert result.iloc[2]["first_name"] == "Hillary"
     assert result.iloc[2]["last_name"] == "Clinton"
 
@@ -361,3 +362,73 @@ def test_model_is_reused(instance):
         "entity": "ORGANIZATION",
         "confidence_score": 1.0,
     }
+
+
+@pytest.fixture
+def names():
+    return pd.DataFrame(
+        {
+            "name": ["Alexis R. Graves", None, "Vacant", "  ", " Mary  Smith "],
+            "phone": ["1", "2", "3", "4", "5"],
+        },
+        index=[40, 30, 20, 10, 0],
+    )
+
+
+def test_split_name_keeps_middle_names_in_last_name(names):
+    result = split_name(names, "name")
+    assert result.loc[40, "first_name"] == "Alexis"
+    assert result.loc[40, "last_name"] == "R. Graves"
+    assert result.loc[0, "first_name"] == "Mary"
+    assert result.loc[0, "last_name"] == "Smith"
+
+
+def test_split_name_keeps_missing_names_missing(names):
+    result = split_name(names, "name")
+    assert result.loc[[30, 10], ["first_name", "last_name"]].isna().all().all()
+    assert result.loc[20, "first_name"] == "Vacant"
+    assert pd.isna(result.loc[20, "last_name"])
+
+
+def test_split_name_keeps_index_and_input(names):
+    original = names.copy()
+    result = split_name(names, "name")
+    assert list(result.index) == [40, 30, 20, 10, 0]
+    assert list(result["phone"]) == ["1", "2", "3", "4", "5"]
+    assert "name" not in result.columns
+    pd.testing.assert_frame_equal(names, original)
+
+
+def test_get_gender_follows_index_and_keeps_input():
+    df = pd.DataFrame(
+        {"first_name": ["Anna", None, "John"]},
+        index=[2, 1, 0],
+    )
+    original = df.copy()
+    result = get_gender(df)
+    assert result["first_name_gender"].to_dict() == {
+        2: "female",
+        1: "Nan value",
+        0: "male",
+    }
+    pd.testing.assert_frame_equal(df, original)
+
+
+def test_get_gender_uses_first_first_name_column():
+    df = pd.DataFrame(
+        {"first_name": ["Anna", "John"], "partner_first_name": ["John", "Anna"]}
+    )
+    result = get_gender(df)
+    assert list(result["first_name_gender"]) == ["female", "male"]
+
+
+def test_get_gender_without_first_name_column():
+    df = pd.DataFrame({"city": ["Rome", "Milan"]})
+    assert list(get_gender(df).columns) == ["city"]
+
+
+def test_get_gender_option_is_deprecated_and_keeps_input():
+    df = pd.DataFrame({"first_name": ["Mary", "John"]})
+    with pytest.warns(FutureWarning, match="get_gender"):
+        NamedEntityRecognizer(df, get_gender_option=True)
+    assert list(df.columns) == ["first_name"]
