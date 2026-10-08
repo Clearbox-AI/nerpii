@@ -6,7 +6,11 @@ import pandas as pd
 import pytest
 
 from nerpii.faker_generator import email_local_part, FakerGenerator
-from nerpii.named_entity_recognizer import NamedEntityRecognizer, split_name
+from nerpii.named_entity_recognizer import (
+    get_gender,
+    NamedEntityRecognizer,
+    split_name,
+)
 
 
 @pytest.fixture
@@ -43,9 +47,13 @@ def dataset():
 
 
 @pytest.fixture
-def dict_global_entities(dataset):
-    dataset = split_name(dataset, "person")
-    recognizer = NamedEntityRecognizer(dataset)
+def split_dataset(dataset):
+    return split_name(dataset, "person")
+
+
+@pytest.fixture
+def dict_global_entities(split_dataset):
+    recognizer = NamedEntityRecognizer(split_dataset)
     recognizer.assign_entities_with_presidio()
     recognizer.assign_entities_manually()
     recognizer.assign_organization_entity_with_model()
@@ -53,8 +61,8 @@ def dict_global_entities(dataset):
 
 
 @pytest.fixture
-def instance(dataset, dict_global_entities):
-    return FakerGenerator(dataset, dict_global_entities)
+def instance(split_dataset, dict_global_entities):
+    return FakerGenerator(split_dataset, dict_global_entities)
 
 
 def test__init__(instance):
@@ -227,6 +235,39 @@ def test_get_first_name_follows_gender_per_row():
     assert names[:3] == ["F", "M", "U"]
     assert pd.isna(names[3])
     assert "first_name_gender" not in generator.dataset.columns
+
+
+def test_split_names_and_genders_reach_the_generator():
+    df = pd.DataFrame(
+        {"name": ["Mary Ann Smith", None, "John Brown"]},
+        index=[7, 5, 3],
+    )
+    df = get_gender(split_name(df, "name"))
+    generator = FakerGenerator(df, entities(first_name="PERSON", last_name="PERSON"))
+    generator.faker = Mock()
+    generator.faker.first_name_female.return_value = "F"
+    generator.faker.first_name_male.return_value = "M"
+    generator.faker.last_name.return_value = "L"
+    result = generator.get_faker_generation()
+    assert list(result.index) == [7, 5, 3]
+    assert list(result.loc[[7, 3], "first_name"]) == ["F", "M"]
+    assert result.loc[5, ["first_name", "last_name"]].isna().all()
+    assert list(result.loc[[7, 3], "last_name"]) == ["L", "L"]
+
+
+def test_italian_name_columns():
+    df = pd.DataFrame({"nome": ["Anna", "Marco"], "cognome": ["Rossi", "Bianchi"]})
+    generator = FakerGenerator(
+        get_gender(df), entities(nome="PERSON", cognome="PERSON"), lang="it"
+    )
+    generator.faker = Mock()
+    generator.faker.first_name_female.return_value = "F"
+    generator.faker.first_name_male.return_value = "M"
+    generator.faker.last_name.return_value = "L"
+    result = generator.get_faker_generation()
+    assert list(result["nome"]) == ["F", "M"]
+    assert list(result["cognome"]) == ["L", "L"]
+    assert list(result.columns) == ["nome", "cognome"]
 
 
 def test_all_last_name_columns_are_synthesized():

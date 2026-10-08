@@ -1,13 +1,21 @@
 from unittest.mock import Mock
 
 import pandas as pd
-from presidio_analyzer import BatchAnalyzerEngine, PatternRecognizer
+from presidio_analyzer import (
+    BatchAnalyzerEngine,
+    DictAnalyzerResult,
+    PatternRecognizer,
+    RecognizerResult,
+)
 import pytest
 from transformers import AutoModelForTokenClassification, AutoTokenizer, pipeline
 
 from nerpii.named_entity_recognizer import (
+    ADDRESS_WORDS,
     en_add_address_entity,
     frequency,
+    get_gender,
+    it_add_address_entity,
     NamedEntityRecognizer,
     split_name,
 )
@@ -35,101 +43,24 @@ def test_frequency():
 
 
 def test_en_add_address_entity():
-    # Test with default arguments
     recognizer = en_add_address_entity()
     assert isinstance(recognizer, PatternRecognizer)
-    assert recognizer.deny_list == [
-        "Street",
-        "Rue",
-        "Via",
-        "Square",
-        "Avenue",
-        "Place",
-        "Strada",
-        "St",
-        "Lane",
-        "Road",
-        "Boulevard",
-        "Ln",
-        "Rd",
-        "HighwayDrive",
-        "Av",
-        "Hwy",
-        "Blvd",
-        "Corso",
-        "Piazza",
-        "Calle",
-        "Plaza",
-        "Avenida",
-        "Rambla",
-        "Vico",
-        "C/",
-    ]
+    assert recognizer.supported_language == "en"
+    assert recognizer.deny_list == ADDRESS_WORDS
+    assert "Highway" in recognizer.deny_list
+    assert "Drive" in recognizer.deny_list
 
-    # Test with additional addresses
-    additional_addresses = ["Alley", "Court"]
-    recognizer = en_add_address_entity(additional_addresses)
-    assert recognizer.deny_list == [
-        "Street",
-        "Rue",
-        "Via",
-        "Square",
-        "Avenue",
-        "Place",
-        "Strada",
-        "St",
-        "Lane",
-        "Road",
-        "Boulevard",
-        "Ln",
-        "Rd",
-        "HighwayDrive",
-        "Av",
-        "Hwy",
-        "Blvd",
-        "Corso",
-        "Piazza",
-        "Calle",
-        "Plaza",
-        "Avenida",
-        "Rambla",
-        "Vico",
-        "C/",
-        "Alley",
-        "Court",
-    ]
+    recognizer = en_add_address_entity(["Alley", "Court"])
+    assert recognizer.deny_list == ADDRESS_WORDS + ["Alley", "Court"]
 
-    # Test with empty list as additional_addresses
-    recognizer = en_add_address_entity([])
-    assert recognizer.deny_list == [
-        "Street",
-        "Rue",
-        "Via",
-        "Square",
-        "Avenue",
-        "Place",
-        "Strada",
-        "St",
-        "Lane",
-        "Road",
-        "Boulevard",
-        "Ln",
-        "Rd",
-        "HighwayDrive",
-        "Av",
-        "Hwy",
-        "Blvd",
-        "Corso",
-        "Piazza",
-        "Calle",
-        "Plaza",
-        "Avenida",
-        "Rambla",
-        "Vico",
-        "C/",
-    ]
 
-    # Test with invalid input
+def test_it_add_address_entity():
+    recognizer = it_add_address_entity(["Vicolo"])
+    assert recognizer.supported_language == "it"
+    assert recognizer.deny_list == ADDRESS_WORDS + ["Vicolo"]
+
+
+def test_add_address_entity_with_invalid_input():
     with pytest.raises(TypeError):
         en_add_address_entity("Invalid input")
 
@@ -163,8 +94,8 @@ def test_split_name_with_dataframe(dataset):
     assert "last_name" in result.columns
     assert result.iloc[0]["first_name"] == "George"
     assert result.iloc[0]["last_name"] == "Bush"
-    assert result.iloc[1]["first_name"] == "-"
-    assert result.iloc[1]["last_name"] == "-"
+    assert pd.isna(result.iloc[1]["first_name"])
+    assert pd.isna(result.iloc[1]["last_name"])
     assert result.iloc[2]["first_name"] == "Hillary"
     assert result.iloc[2]["last_name"] == "Clinton"
 
@@ -175,7 +106,7 @@ def test_split_name_with_invalid_input():
 
 
 def test__init__(instance):
-    assert type(instance.dataset) is str or pd.DataFrame
+    assert isinstance(instance.dataset, pd.DataFrame)
     assert instance.dataset.loc[:, instance.object_columns].isna().values.any() == False
 
     with pytest.raises(ValueError):
@@ -280,19 +211,8 @@ def test_assign_entities_and_score(instance):
 
 
 def test_assign_organization_entity(instance):
-    instance.model_entities = {
-        "university": [
-            "B-ORG",
-            "B-ORG",
-            "I-ORG",
-            "B-ORG",
-            "B-ORG",
-            "I-ORG",
-            "B-ORG",
-            "B-ORG",
-            "I-ORG",
-        ]
-    }
+    # One label list per value: an organization in two of the three values
+    instance.model_entities = {"university": [["B-ORG", "I-ORG"], [], ["B-ORG"]]}
     instance.assign_organization_entity()
     assert instance.dict_global_entities == {
         "email": None,
@@ -300,10 +220,29 @@ def test_assign_organization_entity(instance):
         "state": None,
         "university": {
             "entity": "ORGANIZATION",
-            "confidence_score": 0.6666666666666666,
+            "confidence_score": 2 / 3,
         },
         "person": None,
         "zipcode": None,
+    }
+
+
+def test_organization_score_counts_values_not_tokens(instance):
+    # Many organization tokens in one value still count as one value
+    instance.model_entities = {
+        "university": [["B-ORG", "I-ORG", "I-ORG", "B-ORG"], ["B-PER"], ["B-LOC"]]
+    }
+    instance.assign_organization_entity()
+    assert instance.dict_global_entities["university"]["confidence_score"] == 1 / 3
+
+
+def test_organization_with_italian_labels(instance):
+    # The Italian model labels organizations ORG, without a B-/I- prefix
+    instance.model_entities = {"university": [["ORG"], ["ORG"], ["LOC"]]}
+    instance.assign_organization_entity()
+    assert instance.dict_global_entities["university"] == {
+        "entity": "ORGANIZATION",
+        "confidence_score": 2 / 3,
     }
 
 
@@ -359,5 +298,128 @@ def test_model_is_reused(instance):
     assert instance.model is model
     assert instance.dict_global_entities["university"] == {
         "entity": "ORGANIZATION",
+        "confidence_score": 1.0,
+    }
+
+
+@pytest.fixture
+def names():
+    return pd.DataFrame(
+        {
+            "name": ["Alexis R. Graves", None, "Vacant", "  ", " Mary  Smith "],
+            "phone": ["1", "2", "3", "4", "5"],
+        },
+        index=[40, 30, 20, 10, 0],
+    )
+
+
+def test_split_name_keeps_middle_names_in_last_name(names):
+    result = split_name(names, "name")
+    assert result.loc[40, "first_name"] == "Alexis"
+    assert result.loc[40, "last_name"] == "R. Graves"
+    assert result.loc[0, "first_name"] == "Mary"
+    assert result.loc[0, "last_name"] == "Smith"
+
+
+def test_split_name_keeps_missing_names_missing(names):
+    result = split_name(names, "name")
+    assert result.loc[[30, 10], ["first_name", "last_name"]].isna().all().all()
+    assert result.loc[20, "first_name"] == "Vacant"
+    assert pd.isna(result.loc[20, "last_name"])
+
+
+def test_split_name_keeps_index_and_input(names):
+    original = names.copy()
+    result = split_name(names, "name")
+    assert list(result.index) == [40, 30, 20, 10, 0]
+    assert list(result["phone"]) == ["1", "2", "3", "4", "5"]
+    assert "name" not in result.columns
+    pd.testing.assert_frame_equal(names, original)
+
+
+def test_get_gender_follows_index_and_keeps_input():
+    df = pd.DataFrame(
+        {"first_name": ["Anna", None, "John"]},
+        index=[2, 1, 0],
+    )
+    original = df.copy()
+    result = get_gender(df)
+    assert result["first_name_gender"].to_dict() == {
+        2: "female",
+        1: "Nan value",
+        0: "male",
+    }
+    pd.testing.assert_frame_equal(df, original)
+
+
+def test_get_gender_uses_first_first_name_column():
+    df = pd.DataFrame(
+        {"first_name": ["Anna", "John"], "partner_first_name": ["John", "Anna"]}
+    )
+    result = get_gender(df)
+    assert list(result["first_name_gender"]) == ["female", "male"]
+
+
+def test_get_gender_without_first_name_column():
+    df = pd.DataFrame({"city": ["Rome", "Milan"]})
+    assert list(get_gender(df).columns) == ["city"]
+
+
+def test_get_gender_option_is_deprecated_and_keeps_input():
+    df = pd.DataFrame({"first_name": ["Mary", "John"]})
+    with pytest.warns(FutureWarning, match="get_gender"):
+        NamedEntityRecognizer(df, get_gender_option=True)
+    assert list(df.columns) == ["first_name"]
+
+
+@pytest.mark.parametrize(
+    "column",
+    [
+        "zip",
+        "Zip Code",
+        "ZipCode",
+        "zip5",
+        "postcode",
+        "postal_code",
+        "CAP",
+        "cap_residenza",
+        "codice_postale",
+    ],
+)
+def test_zipcode_columns(column):
+    recognizer = NamedEntityRecognizer(pd.DataFrame({column: ["x"]}))
+    recognizer.assign_entities_manually()
+    assert recognizer.dict_global_entities[column]["entity"] == "ZIPCODE"
+
+
+@pytest.mark.parametrize(
+    "column", ["capital", "capacity", "caption", "escape_flag", "Recap", "unzipped"]
+)
+def test_columns_containing_zip_or_cap_are_not_zipcodes(column):
+    recognizer = NamedEntityRecognizer(pd.DataFrame({column: ["x"]}))
+    recognizer.assign_entities_manually()
+    assert recognizer.dict_global_entities[column] is None
+
+
+def test_presidio_keeps_highest_scoring_entity(instance):
+    def value(*results):
+        return [RecognizerResult(entity, 0, 1, score) for entity, score in results]
+
+    analyzer = Mock()
+    analyzer.analyze_dict.return_value = [
+        DictAnalyzerResult(
+            key="city",
+            value=[],
+            recognizer_results=[
+                value(("PERSON", 0.4), ("LOCATION", 0.85)),
+                value(("LOCATION", 0.85)),
+                value(("DATE_TIME", 0.6), ("LOCATION", 0.85)),
+            ],
+        )
+    ]
+    instance.presidio_analyzer = analyzer
+    instance.assign_entities_with_presidio()
+    assert instance.dict_global_entities["city"] == {
+        "entity": "LOCATION",
         "confidence_score": 1.0,
     }

@@ -9,14 +9,26 @@ import pandas as pd
 GENDER_COLUMN = "first_name_gender"
 
 
+def column_words(column: Any) -> List[str]:
+    """
+    Split a column name into lowercase words ("ZipCode" -> ["zip", "code"],
+    "cap_residenza" -> ["cap", "residenza"]).
+    """
+    column = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", str(column))
+    return re.findall(r"[a-z]+|[0-9]+", column.lower())
+
+
 def is_first_name_column(column: str) -> bool:
-    column = column.lower()
-    return "first" in column and "name" in column
+    lower = column.lower()
+    return ("first" in lower and "name" in lower) or "nome" in column_words(column)
 
 
 def is_last_name_column(column: str) -> bool:
-    column = column.lower()
-    return "last" in column and "name" in column
+    lower = column.lower()
+    words = column_words(column)
+    return ("last" in lower and "name" in lower) or bool(
+        {"surname", "cognome"} & set(words)
+    )
 
 
 def email_local_part(name: Any) -> str:

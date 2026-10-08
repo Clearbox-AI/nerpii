@@ -1,14 +1,12 @@
 from typing import Any, Dict, List, Optional, Union
+import warnings
 
 import gender_guesser.detector as gender
 import pandas as pd
-
-
 from presidio_analyzer import (
     AnalyzerEngine,
     BatchAnalyzerEngine,
     PatternRecognizer,
-    RecognizerRegistry,
 )
 from presidio_analyzer.nlp_engine import NlpEngineProvider
 from transformers import (
@@ -17,6 +15,8 @@ from transformers import (
     logging,
     pipeline,
 )
+
+from nerpii.faker_generator import column_words, GENDER_COLUMN, is_first_name_column
 
 logging.set_verbosity_error()
 
@@ -27,13 +27,17 @@ logging.set_verbosity_error()
 
 def split_name(df_input: Union[str, pd.DataFrame], name_of_column: str) -> pd.DataFrame:
     """
-    Return a pandas dataframe where a given column with person's name is splitted into
-    two columns: first_name and last_name
+    Return a copy of a dataframe where a column with people's full names is replaced
+    by first_name and last_name columns.
+
+    The first word of each name becomes the first name and the rest becomes the last
+    name, so "Alexis R. Graves" gives "Alexis" and "R. Graves". A single word gives a
+    first name and a missing last name, and missing names stay missing.
 
     Parameters
     ----------
-    df_input : pd.DataFrame
-        A pandas dataframe
+    df_input : Union[str, pd.DataFrame]
+        A pandas dataframe or a path to a csv file. A dataframe is not modified.
     name_of_column : str
         name of the column which contains names that have to be splitted
 
@@ -43,34 +47,16 @@ def split_name(df_input: Union[str, pd.DataFrame], name_of_column: str) -> pd.Da
         A pandas dataframe with first_name and last_name columns
     """
 
-    if not isinstance(df_input, pd.DataFrame):
+    if isinstance(df_input, pd.DataFrame):
+        df_input = df_input.copy()
+    else:
         df_input = pd.read_csv(df_input)
 
-    column = df_input[name_of_column]
+    names = df_input[name_of_column].astype("string").str.strip().str.split(n=1)
+    df_input["first_name"] = names.str[0]
+    df_input["last_name"] = names.str[1]
 
-    if column.isna().any():
-        column.fillna("- -", inplace=True)
-
-    list_name = []
-    for i in column:
-        list_name.append(i.split())
-
-    for i in list_name:
-        if len(i) < 2:
-            i.append("-")
-
-    name = []
-    last_name = []
-    for i in list_name:
-        name.append(i[0])
-        last_name.append(i[1])
-
-    df_input["first_name"] = pd.Series(name)
-    df_input["last_name"] = pd.Series(last_name)
-
-    df_input = df_input.drop(name_of_column, axis=1)
-
-    return df_input
+    return df_input.drop(columns=name_of_column)
 
 
 def frequency(values: List, element: Any) -> float:
@@ -92,8 +78,42 @@ def frequency(values: List, element: Any) -> float:
     return values.count(element) / len(values) if len(values) else 0
 
 
-def en_add_address_entity(
-    additional_addresses: Optional[List] = [],
+ADDRESS_WORDS = [
+    "Street",
+    "Rue",
+    "Via",
+    "Square",
+    "Avenue",
+    "Place",
+    "Strada",
+    "St",
+    "Lane",
+    "Road",
+    "Boulevard",
+    "Ln",
+    "Rd",
+    "Highway",
+    "Drive",
+    "Av",
+    "Hwy",
+    "Blvd",
+    "Corso",
+    "Piazza",
+    "Calle",
+    "Plaza",
+    "Avenida",
+    "Rambla",
+    "Vico",
+    "C/",
+]
+
+# Words in a column name that mark it as a zipcode column. "cap" is the Italian
+# codice di avviamento postale.
+ZIPCODE_WORDS = {"zip", "zipcode", "postcode", "postalcode", "cap"}
+
+
+def add_address_entity(
+    lang: str, additional_addresses: Optional[List] = []
 ) -> PatternRecognizer:
     """
     Return a customized presidio recognizer that can recognize ADDRESS entity.
@@ -101,6 +121,8 @@ def en_add_address_entity(
 
     Parameters
     ----------
+    lang : str
+        Language of the recognizer, "en" or "it"
     additional_addresses : Optional[List], optional
         A list in which user can add new address-related words, by default []
 
@@ -109,122 +131,73 @@ def en_add_address_entity(
     PatternRecognizer
         A customized presidio recognizer
     """
-
-    addresses = [
-        "Street",
-        "Rue",
-        "Via",
-        "Square",
-        "Avenue",
-        "Place",
-        "Strada",
-        "St",
-        "Lane",
-        "Road",
-        "Boulevard",
-        "Ln",
-        "Rd",
-        "HighwayDrive",
-        "Av",
-        "Hwy",
-        "Blvd",
-        "Corso",
-        "Piazza",
-        "Calle",
-        "Plaza",
-        "Avenida",
-        "Rambla",
-        "Vico",
-        "C/",
-    ]
-    addresses = addresses + additional_addresses
-    en_addresses_recognizer = PatternRecognizer(
-        supported_language="en", supported_entity="ADDRESS", deny_list=addresses
+    return PatternRecognizer(
+        supported_language=lang,
+        supported_entity="ADDRESS",
+        deny_list=ADDRESS_WORDS + additional_addresses,
     )
 
-    return en_addresses_recognizer
+
+def en_add_address_entity(
+    additional_addresses: Optional[List] = [],
+) -> PatternRecognizer:
+    """English version of add_address_entity."""
+    return add_address_entity("en", additional_addresses)
 
 
 def it_add_address_entity(
     additional_addresses: Optional[List] = [],
 ) -> PatternRecognizer:
-    """
-    Return a customized presidio recognizer that can recognize ADDRESS entity.
-    Some address-related words are already set, but user can add others.
+    """Italian version of add_address_entity."""
+    return add_address_entity("it", additional_addresses)
 
-    Parameters
-    ----------
-    additional_addresses : Optional[List], optional
-        A list in which user can add new address-related words, by default []
 
-    Returns
-    -------
-    PatternRecognizer
-        A customized presidio recognizer
-    """
-
-    addresses = [
-        "Street",
-        "Rue",
-        "Via",
-        "Square",
-        "Avenue",
-        "Place",
-        "Strada",
-        "St",
-        "Lane",
-        "Road",
-        "Boulevard",
-        "Ln",
-        "Rd",
-        "HighwayDrive",
-        "Av",
-        "Hwy",
-        "Blvd",
-        "Corso",
-        "Piazza",
-        "Calle",
-        "Plaza",
-        "Avenida",
-        "Rambla",
-        "Vico",
-        "C/",
-    ]
-    addresses = addresses + additional_addresses
-    it_addresses_recognizer = PatternRecognizer(
-        supported_language="it", supported_entity="ADDRESS", deny_list=addresses
+def is_zipcode_column(column: str) -> bool:
+    words = column_words(column)
+    return bool(ZIPCODE_WORDS & set(words)) or (
+        ("postal" in words or "postale" in words)
+        and ("code" in words or "codice" in words)
     )
 
-    return it_addresses_recognizer
+
+def has_organization(labels: List[str]) -> bool:
+    """
+    Whether the NLP model found an organization in a value, given the labels of its
+    tokens. The English model uses B-ORG/I-ORG labels and the Italian one ORG.
+    """
+    return any(label.split("-")[-1] == "ORG" for label in labels)
 
 
 def get_gender(df_input: pd.DataFrame) -> pd.DataFrame:
-    """Assign gender to each name in dataset
+    """
+    Return a copy of a dataframe with a first_name_gender column, guessed from its
+    first first-name column.
+
+    Pass the result to FakerGenerator to generate first names of the same gender as
+    the original ones. The generator drops the column from its output.
 
     Parameters
     ----------
     df_input : pd.DataFrame
-        A pandas dataframe
-
+        A pandas dataframe. It is not modified.
 
     Returns
     -------
     pd.DataFrame
-        A pandas dataframe with first_name_gender column
+        A pandas dataframe with first_name_gender column, if it has a first-name
+        column
     """
+    df_input = df_input.copy()
+    first_names = [
+        column for column in df_input.columns if is_first_name_column(column)
+    ]
+    if not first_names:
+        return df_input
+
     detector = gender.Detector(case_sensitive=False)
-    first_name_gender = []
-
-    for column in df_input.columns:
-        if ("first" in column.lower()) and ("name" in column.lower()):
-            for name in df_input[column]:
-                if pd.notna(name):
-                    first_name_gender.append(detector.get_gender(name))
-                else:
-                    first_name_gender.append("Nan value")
-
-    if len(first_name_gender) > 0:
-        df_input["first_name_gender"] = pd.Series(first_name_gender)
+    df_input[GENDER_COLUMN] = df_input[first_names[0]].map(
+        lambda name: detector.get_gender(str(name)) if pd.notna(name) else "Nan value"
+    )
 
     return df_input
 
@@ -247,8 +220,8 @@ class NamedEntityRecognizer:
     model : Any
         A pretrained nlp model downloaded from Hugging Face, loaded on first use
     model_entities : Dict
-        A dictionary whose keys are object column names and whose values are a list
-        containing all the entities assigned to each value by the model
+        A dictionary whose keys are object column names and whose values are lists
+        with the labels the model assigned to the tokens of each value
     dict_global_entities : Dict
         A dictionary whose keys have the same names of the dataframe columns and values
         are dictionaries in which the entity associated to the column and its confidence
@@ -292,8 +265,7 @@ class NamedEntityRecognizer:
             Input language by default "en". Set this parameter to "it" to return
             better performance on Italian data.
         get_gender_option : Optional[bool], optional
-            Whether to add a first_name_gender column guessed from first name columns,
-            by default False
+            Deprecated and ignored, use get_gender() instead. By default False
         random_state : Optional[int], optional
             Seed for sampling the rows, by default None
 
@@ -306,8 +278,14 @@ class NamedEntityRecognizer:
         if not isinstance(df_input, pd.DataFrame):
             df_input = pd.read_csv(df_input)
 
-        if get_gender_option == True:
-            df_input = get_gender(df_input)
+        if get_gender_option:
+            warnings.warn(
+                "get_gender_option no longer adds a first_name_gender column to your "
+                "dataframe and will be removed. Call get_gender() on the dataframe and "
+                "pass the result to FakerGenerator instead.",
+                FutureWarning,
+                stacklevel=2,
+            )
 
         self.dataset = df_input.sample(
             n=min(data_sample, df_input.shape[0]), random_state=random_state
@@ -431,10 +409,11 @@ class NamedEntityRecognizer:
             col_name = col.key
             if col_name in self.object_columns:
                 # Get the list of entities for each record in the column
+                # Keep the highest-scoring entity found in each value
                 entities_list = [
-                    single_value_type[0].entity_type
-                    for single_value_type in col.recognizer_results
-                    if len(single_value_type) > 0
+                    max(value_results, key=lambda result: result.score).entity_type
+                    for value_results in col.recognizer_results
+                    if len(value_results) > 0
                 ]
                 # If the number of entities is more than 30% of the number of records,
                 # assign the list to the column
@@ -490,26 +469,24 @@ class NamedEntityRecognizer:
 
         for col in self.object_columns:
             if self.dict_global_entities[col] is None:
-                self.model_entities[col] = self.model(self.dataset[col].tolist())
                 self.model_entities[col] = [
-                    item["entity"]
-                    for sublist in self.model_entities[col]
-                    for item in sublist
+                    [token["entity"] for token in tokens]
+                    for tokens in self.model(self.dataset[col].tolist())
                 ]
 
     def assign_organization_entity(self) -> None:
         """
-        Check whether the B-ORG entity is present among the entities assigned to the
-        values in each column by the NLP model.
+        Check in how many values of each column the NLP model found an organization.
 
-        If the B-ORG entity has been assigned to at least 10 percent of the values in
-        that column, then the function assigns the LOCATION entity and the confidence
-        score to that specific column.
+        If it found one in more than 10 percent of the values in that column, then the
+        function assigns the ORGANIZATION entity to that column, with that share as
+        the confidence score.
         """
         for col in self.model_entities:
-            entities_list = self.model_entities[col]
-            organization_freq = frequency(entities_list, "B-ORG")
-            if ("B-ORG" in entities_list) and organization_freq > 0.1:
+            organization_freq = frequency(
+                [has_organization(labels) for labels in self.model_entities[col]], True
+            )
+            if organization_freq > 0.1:
                 self.dict_global_entities[col] = {
                     "entity": "ORGANIZATION",
                     "confidence_score": organization_freq,
@@ -530,11 +507,7 @@ class NamedEntityRecognizer:
         """
         for col in self.dict_global_entities:
             col_lower = col.lower()
-            if zipcode and (
-                (("postal" in col_lower) and ("code" in col_lower))
-                or ("zip" in col_lower)
-                or ("cap" in col_lower)
-            ):
+            if zipcode and is_zipcode_column(col):
                 self.dict_global_entities[col] = {
                     "entity": "ZIPCODE",
                     "confidence_score": 1.0,
