@@ -19,7 +19,7 @@ from transformers import (
     pipeline,
 )
 
-from nerpii.faker_generator import GENDER_COLUMN, is_first_name_column
+from nerpii.faker_generator import column_words, GENDER_COLUMN, is_first_name_column
 
 logging.set_verbosity_error()
 
@@ -81,8 +81,42 @@ def frequency(values: List, element: Any) -> float:
     return values.count(element) / len(values) if len(values) else 0
 
 
-def en_add_address_entity(
-    additional_addresses: Optional[List] = [],
+ADDRESS_WORDS = [
+    "Street",
+    "Rue",
+    "Via",
+    "Square",
+    "Avenue",
+    "Place",
+    "Strada",
+    "St",
+    "Lane",
+    "Road",
+    "Boulevard",
+    "Ln",
+    "Rd",
+    "Highway",
+    "Drive",
+    "Av",
+    "Hwy",
+    "Blvd",
+    "Corso",
+    "Piazza",
+    "Calle",
+    "Plaza",
+    "Avenida",
+    "Rambla",
+    "Vico",
+    "C/",
+]
+
+# Words in a column name that mark it as a zipcode column. "cap" is the Italian
+# codice di avviamento postale.
+ZIPCODE_WORDS = {"zip", "zipcode", "postcode", "postalcode", "cap"}
+
+
+def add_address_entity(
+    lang: str, additional_addresses: Optional[List] = []
 ) -> PatternRecognizer:
     """
     Return a customized presidio recognizer that can recognize ADDRESS entity.
@@ -90,6 +124,8 @@ def en_add_address_entity(
 
     Parameters
     ----------
+    lang : str
+        Language of the recognizer, "en" or "it"
     additional_addresses : Optional[List], optional
         A list in which user can add new address-related words, by default []
 
@@ -98,93 +134,41 @@ def en_add_address_entity(
     PatternRecognizer
         A customized presidio recognizer
     """
-
-    addresses = [
-        "Street",
-        "Rue",
-        "Via",
-        "Square",
-        "Avenue",
-        "Place",
-        "Strada",
-        "St",
-        "Lane",
-        "Road",
-        "Boulevard",
-        "Ln",
-        "Rd",
-        "HighwayDrive",
-        "Av",
-        "Hwy",
-        "Blvd",
-        "Corso",
-        "Piazza",
-        "Calle",
-        "Plaza",
-        "Avenida",
-        "Rambla",
-        "Vico",
-        "C/",
-    ]
-    addresses = addresses + additional_addresses
-    en_addresses_recognizer = PatternRecognizer(
-        supported_language="en", supported_entity="ADDRESS", deny_list=addresses
+    return PatternRecognizer(
+        supported_language=lang,
+        supported_entity="ADDRESS",
+        deny_list=ADDRESS_WORDS + additional_addresses,
     )
 
-    return en_addresses_recognizer
+
+def en_add_address_entity(
+    additional_addresses: Optional[List] = [],
+) -> PatternRecognizer:
+    """English version of add_address_entity."""
+    return add_address_entity("en", additional_addresses)
 
 
 def it_add_address_entity(
     additional_addresses: Optional[List] = [],
 ) -> PatternRecognizer:
-    """
-    Return a customized presidio recognizer that can recognize ADDRESS entity.
-    Some address-related words are already set, but user can add others.
+    """Italian version of add_address_entity."""
+    return add_address_entity("it", additional_addresses)
 
-    Parameters
-    ----------
-    additional_addresses : Optional[List], optional
-        A list in which user can add new address-related words, by default []
 
-    Returns
-    -------
-    PatternRecognizer
-        A customized presidio recognizer
-    """
-
-    addresses = [
-        "Street",
-        "Rue",
-        "Via",
-        "Square",
-        "Avenue",
-        "Place",
-        "Strada",
-        "St",
-        "Lane",
-        "Road",
-        "Boulevard",
-        "Ln",
-        "Rd",
-        "HighwayDrive",
-        "Av",
-        "Hwy",
-        "Blvd",
-        "Corso",
-        "Piazza",
-        "Calle",
-        "Plaza",
-        "Avenida",
-        "Rambla",
-        "Vico",
-        "C/",
-    ]
-    addresses = addresses + additional_addresses
-    it_addresses_recognizer = PatternRecognizer(
-        supported_language="it", supported_entity="ADDRESS", deny_list=addresses
+def is_zipcode_column(column: str) -> bool:
+    words = column_words(column)
+    return bool(ZIPCODE_WORDS & set(words)) or (
+        ("postal" in words or "postale" in words)
+        and ("code" in words or "codice" in words)
     )
 
-    return it_addresses_recognizer
+
+def has_organization(labels: List[str]) -> bool:
+    """
+    Whether the NLP model found an organization in a value, given the labels of its
+    tokens. The English model uses B-ORG/I-ORG labels and the Italian one ORG.
+    """
+    return any(label.split("-")[-1] == "ORG" for label in labels)
 
 
 def get_gender(df_input: pd.DataFrame) -> pd.DataFrame:
@@ -239,8 +223,8 @@ class NamedEntityRecognizer:
     model : Any
         A pretrained nlp model downloaded from Hugging Face, loaded on first use
     model_entities : Dict
-        A dictionary whose keys are object column names and whose values are a list
-        containing all the entities assigned to each value by the model
+        A dictionary whose keys are object column names and whose values are lists
+        with the labels the model assigned to the tokens of each value
     dict_global_entities : Dict
         A dictionary whose keys have the same names of the dataframe columns and values
         are dictionaries in which the entity associated to the column and its confidence
@@ -428,10 +412,11 @@ class NamedEntityRecognizer:
             col_name = col.key
             if col_name in self.object_columns:
                 # Get the list of entities for each record in the column
+                # Keep the highest-scoring entity found in each value
                 entities_list = [
-                    single_value_type[0].entity_type
-                    for single_value_type in col.recognizer_results
-                    if len(single_value_type) > 0
+                    max(value_results, key=lambda result: result.score).entity_type
+                    for value_results in col.recognizer_results
+                    if len(value_results) > 0
                 ]
                 # If the number of entities is more than 30% of the number of records,
                 # assign the list to the column
@@ -487,26 +472,24 @@ class NamedEntityRecognizer:
 
         for col in self.object_columns:
             if self.dict_global_entities[col] is None:
-                self.model_entities[col] = self.model(self.dataset[col].tolist())
                 self.model_entities[col] = [
-                    item["entity"]
-                    for sublist in self.model_entities[col]
-                    for item in sublist
+                    [token["entity"] for token in tokens]
+                    for tokens in self.model(self.dataset[col].tolist())
                 ]
 
     def assign_organization_entity(self) -> None:
         """
-        Check whether the B-ORG entity is present among the entities assigned to the
-        values in each column by the NLP model.
+        Check in how many values of each column the NLP model found an organization.
 
-        If the B-ORG entity has been assigned to at least 10 percent of the values in
-        that column, then the function assigns the LOCATION entity and the confidence
-        score to that specific column.
+        If it found one in more than 10 percent of the values in that column, then the
+        function assigns the ORGANIZATION entity to that column, with that share as
+        the confidence score.
         """
         for col in self.model_entities:
-            entities_list = self.model_entities[col]
-            organization_freq = frequency(entities_list, "B-ORG")
-            if ("B-ORG" in entities_list) and organization_freq > 0.1:
+            organization_freq = frequency(
+                [has_organization(labels) for labels in self.model_entities[col]], True
+            )
+            if organization_freq > 0.1:
                 self.dict_global_entities[col] = {
                     "entity": "ORGANIZATION",
                     "confidence_score": organization_freq,
@@ -527,11 +510,7 @@ class NamedEntityRecognizer:
         """
         for col in self.dict_global_entities:
             col_lower = col.lower()
-            if zipcode and (
-                (("postal" in col_lower) and ("code" in col_lower))
-                or ("zip" in col_lower)
-                or ("cap" in col_lower)
-            ):
+            if zipcode and is_zipcode_column(col):
                 self.dict_global_entities[col] = {
                     "entity": "ZIPCODE",
                     "confidence_score": 1.0,

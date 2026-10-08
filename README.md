@@ -83,6 +83,8 @@ generator = FakerGenerator(dataset, recognizer.dict_global_entities)
 ```
 If you want to generate Italian PII, add ```lang = "it"``` as parameter to the previous object (default: ```lang = "en"```)
 
+First and last names are generated for PERSON columns whose names mark them as name columns: e.g. `first_name`, `FirstName` or `nome` for first names, and `last_name`, `surname` or `cognome` for last names.
+
 To generate first names of the same gender as the original ones, add a gender column with `get_gender()` before creating the generator. The generator drops the column from its output.
 
 ```python

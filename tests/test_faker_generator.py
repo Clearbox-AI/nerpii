@@ -255,6 +255,21 @@ def test_split_names_and_genders_reach_the_generator():
     assert list(result.loc[[7, 3], "last_name"]) == ["L", "L"]
 
 
+def test_italian_name_columns():
+    df = pd.DataFrame({"nome": ["Anna", "Marco"], "cognome": ["Rossi", "Bianchi"]})
+    generator = FakerGenerator(
+        get_gender(df), entities(nome="PERSON", cognome="PERSON"), lang="it"
+    )
+    generator.faker = Mock()
+    generator.faker.first_name_female.return_value = "F"
+    generator.faker.first_name_male.return_value = "M"
+    generator.faker.last_name.return_value = "L"
+    result = generator.get_faker_generation()
+    assert list(result["nome"]) == ["F", "M"]
+    assert list(result["cognome"]) == ["L", "L"]
+    assert list(result.columns) == ["nome", "cognome"]
+
+
 def test_all_last_name_columns_are_synthesized():
     df = pd.DataFrame({"last_name": ["Rossi"], "mother_last_name": ["Bianchi"]})
     generator = FakerGenerator(df, {})
