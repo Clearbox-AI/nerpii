@@ -1,3 +1,5 @@
+import datetime as dt
+from decimal import Decimal
 from unittest.mock import Mock
 
 import pandas as pd
@@ -12,10 +14,13 @@ from transformers import AutoModelForTokenClassification, AutoTokenizer, pipelin
 
 from nerpii.named_entity_recognizer import (
     ADDRESS_WORDS,
+    build_model,
+    build_presidio_analyzer,
     en_add_address_entity,
     frequency,
     get_gender,
     it_add_address_entity,
+    ModelUnavailable,
     NamedEntityRecognizer,
     split_name,
 )
@@ -423,3 +428,185 @@ def test_presidio_keeps_highest_scoring_entity(instance):
         "entity": "LOCATION",
         "confidence_score": 1.0,
     }
+
+
+def _results(key, *values):
+    """A DictAnalyzerResult with one list of (entity, score) pairs per value."""
+    return DictAnalyzerResult(
+        key=key,
+        value=[],
+        recognizer_results=[
+            [RecognizerResult(entity, 0, 1, score) for entity, score in value]
+            for value in values
+        ],
+    )
+
+
+def _fail(*args, **kwargs):
+    raise AssertionError("a model was loaded")
+
+
+def test_build_presidio_analyzer_offline_does_not_download(monkeypatch):
+    monkeypatch.setattr("spacy.util.is_package", lambda name: False)
+    monkeypatch.setattr("spacy.cli.download", _fail)
+    monkeypatch.setattr("spacy.load", _fail)
+    with pytest.raises(ModelUnavailable, match="it_core_news_lg"):
+        build_presidio_analyzer("it", offline=True)
+
+
+def test_build_model_offline_uses_the_local_cache_only(monkeypatch):
+    calls = []
+
+    def missing(name, **kwargs):
+        calls.append(kwargs)
+        raise OSError("not in the cache")
+
+    monkeypatch.setattr(
+        "nerpii.named_entity_recognizer.AutoTokenizer.from_pretrained", missing
+    )
+    with pytest.raises(ModelUnavailable, match="dslim/bert-base-NER"):
+        build_model("en", offline=True)
+    assert calls == [{"local_files_only": True}]
+
+
+def test_build_model_online_errors_are_not_hidden(monkeypatch):
+    def missing(name, **kwargs):
+        raise OSError("no network")
+
+    monkeypatch.setattr(
+        "nerpii.named_entity_recognizer.AutoTokenizer.from_pretrained", missing
+    )
+    with pytest.raises(OSError, match="no network"):
+        build_model("en")
+
+
+def test_engines_passed_in_are_used(dataset, monkeypatch):
+    monkeypatch.setattr("spacy.load", _fail)
+    monkeypatch.setattr(
+        "nerpii.named_entity_recognizer.AutoModelForTokenClassification"
+        ".from_pretrained",
+        _fail,
+    )
+    analyzer = Mock()
+    analyzer.analyze_dict.return_value = []
+    model = Mock(side_effect=lambda values: [[] for _ in values])
+    recognizer = NamedEntityRecognizer(dataset, presidio_analyzer=analyzer, model=model)
+    recognizer.assign_entities_with_presidio()
+    recognizer.assign_organization_entity_with_model()
+    assert analyzer.analyze_dict.call_count == 1
+    assert model.call_count == len(recognizer.object_columns)
+
+
+def test_only_text_columns_are_analyzed():
+    df = pd.DataFrame(
+        {
+            "name": ["Mario Rossi", "Anna Bianchi"],
+            "born": [dt.date(1980, 1, 1), dt.date(1990, 2, 2)],
+            "amount": [Decimal("1.5"), Decimal("2.5")],
+            "mixed": ["a", 1],
+            "count": [1, 2],
+            "seen": pd.to_datetime(["2020-01-01", "2021-01-01"]),
+        }
+    )
+    analyzer = Mock()
+    analyzer.analyze_dict.return_value = []
+    recognizer = NamedEntityRecognizer(df, presidio_analyzer=analyzer)
+    assert recognizer.object_columns == ["name", "mixed"]
+    recognizer.assign_entities_with_presidio()
+    sent = analyzer.analyze_dict.call_args.args[0]
+    assert list(sent) == ["name", "mixed"]
+    assert list(recognizer.dict_global_entities) == list(df.columns)
+
+
+def test_columns_restricts_the_analysis(dataset):
+    recognizer = NamedEntityRecognizer(dataset, columns=["email", "person"])
+    assert recognizer.object_columns == ["email", "person"]
+
+
+def test_no_text_columns_loads_nothing(monkeypatch):
+    monkeypatch.setattr("spacy.load", _fail)
+    recognizer = NamedEntityRecognizer(pd.DataFrame({"n": [1, 2, 3]}))
+    recognizer.assign_entities_with_presidio()
+    assert recognizer.presidio_analyzer is None
+    assert recognizer.dict_global_entities == {"n": None}
+
+
+def test_column_stats_count_missing_values_out():
+    df = pd.DataFrame({"notes": ["Seen by Dr. Rossi", None, "stable", "Rossi, Via Po"]})
+    found = {
+        "Seen by Dr. Rossi": [("PERSON", 0.85)],
+        "Rossi, Via Po": [("PERSON", 0.85), ("ADDRESS", 1.0)],
+    }
+    analyzer = Mock()
+    # Results follow the sampled (shuffled) rows; the missing value arrives as "?"
+    analyzer.analyze_dict.side_effect = lambda values, language: [
+        _results("notes", *(found.get(v, []) for v in values["notes"]))
+    ]
+    recognizer = NamedEntityRecognizer(df, presidio_analyzer=analyzer)
+    recognizer.assign_entities_with_presidio()
+    assert recognizer.column_stats["notes"] == {
+        "n_values": 3,
+        "n_detected": 2,
+        "entity_values": {"PERSON": 2, "ADDRESS": 1},
+        "top_entity_values": {"PERSON": 1, "ADDRESS": 1},
+    }
+    # The confidence score is unchanged: a share of the values with a detection
+    assert recognizer.dict_global_entities["notes"]["confidence_score"] == 0.5
+
+
+def test_model_reads_each_distinct_value_once():
+    df = pd.DataFrame(
+        {
+            "company": ["Acme", "Acme", "Globex", None, "Acme"],
+            "notes": ["long text"] * 5,
+        }
+    )
+    read = []
+
+    def model(values):
+        read.append(list(values))
+        return [[{"entity": "B-ORG"}] if v == "Acme" else [] for v in values]
+
+    analyzer = Mock()
+    analyzer.analyze_dict.return_value = []
+    recognizer = NamedEntityRecognizer(df, presidio_analyzer=analyzer, model=model)
+    recognizer.assign_entities_with_presidio()
+    recognizer.assign_organization_entity_with_model(skip_columns=["notes"])
+    # One call, each distinct value once (in the order of the shuffled sample)
+    assert len(read) == 1 and sorted(read[0]) == ["?", "Acme", "Globex"]
+    expected = [
+        ["B-ORG"] if value == "Acme" else [] for value in recognizer.dataset["company"]
+    ]
+    assert recognizer.model_entities["company"] == expected
+    assert recognizer.dict_global_entities["company"] == {
+        "entity": "ORGANIZATION",
+        "confidence_score": 3 / 5,
+    }
+    assert recognizer.column_stats["company"]["organization_values"] == 3
+    assert recognizer.dict_global_entities["notes"] is None
+
+
+def test_model_is_not_loaded_when_no_column_needs_it(monkeypatch):
+    monkeypatch.setattr(
+        "nerpii.named_entity_recognizer.AutoModelForTokenClassification"
+        ".from_pretrained",
+        _fail,
+    )
+    recognizer = NamedEntityRecognizer(pd.DataFrame({"notes": ["a", "b"]}))
+    recognizer.assign_organization_entity_with_model(skip_columns=["notes"])
+    assert recognizer.model is None
+
+
+@pytest.mark.parametrize(
+    "text, found",
+    [
+        ("Via Roma 12, Milano", True),
+        ("221B Baker Street", True),
+        ("morphine given via IV", False),
+        ("patient in stable place", False),
+    ],
+)
+def test_address_words_match_their_case(text, found):
+    recognizer = en_add_address_entity()
+    results = recognizer.analyze(text, ["ADDRESS"])
+    assert bool(results) is found

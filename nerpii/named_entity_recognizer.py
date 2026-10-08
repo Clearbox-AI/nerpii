@@ -1,4 +1,5 @@
-from typing import Any, Dict, List, Optional, Union
+import re
+from typing import Any, Dict, List, Optional, Sequence, Union
 import warnings
 
 import gender_guesser.detector as gender
@@ -9,6 +10,7 @@ from presidio_analyzer import (
     PatternRecognizer,
 )
 from presidio_analyzer.nlp_engine import NlpEngineProvider
+import spacy
 from transformers import (
     AutoModelForTokenClassification,
     AutoTokenizer,
@@ -107,6 +109,22 @@ ADDRESS_WORDS = [
     "C/",
 ]
 
+# Address words are matched with their case: lowercase "via" and "place" are
+# common words, and in free text they would beat the names found by spaCy.
+ADDRESS_REGEX_FLAGS = re.DOTALL | re.MULTILINE
+
+SPACY_MODELS = {"en": "en_core_web_lg", "it": "it_core_news_lg"}
+HF_MODELS = {"en": "dslim/bert-base-NER", "it": "osiria/bert-italian-uncased-ner"}
+
+# Values the NLP model reads at once
+MODEL_BATCH_SIZE = 32
+
+
+class ModelUnavailable(RuntimeError):
+    """A spaCy or Hugging Face model is not installed and offline=True forbids
+    downloading it."""
+
+
 # Words in a column name that mark it as a zipcode column. "cap" is the Italian
 # codice di avviamento postale.
 ZIPCODE_WORDS = {"zip", "zipcode", "postcode", "postalcode", "cap"}
@@ -135,6 +153,7 @@ def add_address_entity(
         supported_language=lang,
         supported_entity="ADDRESS",
         deny_list=ADDRESS_WORDS + additional_addresses,
+        global_regex_flags=ADDRESS_REGEX_FLAGS,
     )
 
 
@@ -166,6 +185,111 @@ def has_organization(labels: List[str]) -> bool:
     tokens. The English model uses B-ORG/I-ORG labels and the Italian one ORG.
     """
     return any(label.split("-")[-1] == "ORG" for label in labels)
+
+
+def build_presidio_analyzer(
+    lang: str = "en",
+    *,
+    add_addresses_recognizer: bool = True,
+    additional_addresses: Optional[List] = None,
+    score_threshold: float = 0.0,
+    offline: bool = False,
+) -> BatchAnalyzerEngine:
+    """
+    Build a Presidio BatchAnalyzerEngine, to pass to one or more NamedEntityRecognizer
+    instances so that the spaCy model is loaded once.
+
+    Parameters
+    ----------
+    lang : str, optional
+        Language, "en" (en_core_web_lg) or "it" (it_core_news_lg), by default "en"
+    add_addresses_recognizer : bool, optional
+        Whether to add a customized address recognizer, by default True
+    additional_addresses : Optional[List], optional
+        Address-related words to add to the address recognizer, by default None
+    score_threshold : float, optional
+        Detections scoring below this are discarded, by default 0.0 (Presidio's
+        default, which keeps them all)
+    offline : bool, optional
+        Raise ModelUnavailable instead of downloading a missing spaCy model, by
+        default False
+
+    Returns
+    -------
+    BatchAnalyzerEngine
+        A Presidio batch analyzer
+    """
+    lang = "it" if lang == "it" else "en"
+    model_name = SPACY_MODELS[lang]
+    if offline and not spacy.util.is_package(model_name):
+        raise ModelUnavailable(
+            f"the spaCy model {model_name} is not installed "
+            f"(python -m spacy download {model_name})"
+        )
+    if lang == "it":
+        configuration = {
+            "nlp_engine_name": "spacy",
+            "models": [{"lang_code": "it", "model_name": model_name}],
+        }
+        provider = NlpEngineProvider(nlp_configuration=configuration)
+    else:
+        # Presidio's default configuration: en_core_web_lg, with spaCy's ORG
+        # and number labels ignored
+        provider = NlpEngineProvider()
+    nlp_engine = provider.create_engine()
+    analyzer = AnalyzerEngine(
+        nlp_engine=nlp_engine,
+        supported_languages=[lang],
+        default_score_threshold=score_threshold,
+    )
+    if add_addresses_recognizer:
+        analyzer.registry.add_recognizer(
+            add_address_entity(lang, list(additional_addresses or []))
+        )
+    return BatchAnalyzerEngine(analyzer_engine=analyzer)
+
+
+def build_model(
+    lang: str = "en", *, batch_size: int = MODEL_BATCH_SIZE, offline: bool = False
+) -> Any:
+    """
+    Build the Hugging Face token-classification pipeline that finds organizations,
+    to pass to one or more NamedEntityRecognizer instances so that it is loaded once.
+
+    Parameters
+    ----------
+    lang : str, optional
+        Language, "en" (dslim/bert-base-NER) or "it"
+        (osiria/bert-italian-uncased-ner), by default "en"
+    batch_size : int, optional
+        Values the model reads at once, by default 32
+    offline : bool, optional
+        Only use the local Hugging Face cache, and raise ModelUnavailable if the
+        model is not in it, by default False
+
+    Returns
+    -------
+    Any
+        A transformers "ner" pipeline
+    """
+    model_name = HF_MODELS["it" if lang == "it" else "en"]
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(model_name, local_files_only=offline)
+        model = AutoModelForTokenClassification.from_pretrained(
+            model_name, local_files_only=offline
+        )
+    except OSError as exc:
+        if offline:
+            raise ModelUnavailable(
+                f"the Hugging Face model {model_name} is not in the local cache "
+                f"(huggingface-cli download {model_name})"
+            ) from exc
+        raise
+    return pipeline("ner", model=model, tokenizer=tokenizer, batch_size=batch_size)
+
+
+def _is_primitive(value: Any) -> bool:
+    return isinstance(value, (str, int, float, bool))
 
 
 def get_gender(df_input: pd.DataFrame) -> pd.DataFrame:
@@ -211,14 +335,15 @@ class NamedEntityRecognizer:
     dataset : pd.DataFrame
         A pandas dataframe containing a sample of the dataset.
     object_columns : List
-        A list of the object columns of the dataset.
+        The text columns of the dataset that are analyzed: object or string columns
+        whose values are all strings, numbers or booleans.
     presidio_analyzer : BatchAnalyzerEngine
-        A Presidio BatchAnalyzerEngine instance, created on first use.
+        A Presidio BatchAnalyzerEngine instance, passed in or created on first use.
     assigned_entities_cols : List
         A list of the object columns of the dataset for which entities have been
          assigned.
     model : Any
-        A pretrained nlp model downloaded from Hugging Face, loaded on first use
+        A pretrained nlp model from Hugging Face, passed in or loaded on first use
     model_entities : Dict
         A dictionary whose keys are object column names and whose values are lists
         with the labels the model assigned to the tokens of each value
@@ -226,6 +351,13 @@ class NamedEntityRecognizer:
         A dictionary whose keys have the same names of the dataframe columns and values
         are dictionaries in which the entity associated to the column and its confidence
         score are reported.
+    column_stats : Dict
+        For each analyzed column, how many of its sampled values are not missing
+        ("n_values"), have any Presidio detection ("n_detected"), contain each entity
+        ("entity_values"), have each entity as their highest-scoring one
+        ("top_entity_values") and, after the NLP model ran, contain an organization
+        ("organization_values"). Unlike the confidence score, these count missing
+        values out, so a share of n_values is the share of the column.
     """
 
     original_dataset: pd.DataFrame
@@ -236,7 +368,9 @@ class NamedEntityRecognizer:
     model: Any
     model_entities: Dict
     dict_global_entities: Dict
+    column_stats: Dict
     lang: str
+    offline: bool
 
     def __init__(
         self,
@@ -246,12 +380,18 @@ class NamedEntityRecognizer:
         lang: Optional[str] = "en",
         get_gender_option: Optional[bool] = False,
         random_state: Optional[int] = None,
+        columns: Optional[Sequence[str]] = None,
+        presidio_analyzer: Optional[BatchAnalyzerEngine] = None,
+        model: Any = None,
+        offline: bool = False,
     ) -> "NamedEntityRecognizer":
         """
         Create a NamedEntityRecognizer instance.
 
         The Presidio analyzer and the Hugging Face model are loaded the first time
-        they are needed. Presidio downloads its spaCy model if it is not installed.
+        they are needed, unless they are passed in (see build_presidio_analyzer and
+        build_model). Presidio downloads its spaCy model if it is not installed,
+        unless offline is True.
 
         Parameters
         ----------
@@ -268,6 +408,15 @@ class NamedEntityRecognizer:
             Deprecated and ignored, use get_gender() instead. By default False
         random_state : Optional[int], optional
             Seed for sampling the rows, by default None
+        columns : Optional[Sequence[str]], optional
+            Analyze only these columns, by default all the text columns
+        presidio_analyzer : Optional[BatchAnalyzerEngine], optional
+            A Presidio analyzer to use instead of building one, by default None
+        model : Any, optional
+            An NLP pipeline to use instead of loading one, by default None
+        offline : bool, optional
+            Never download a model: raise ModelUnavailable if one is not installed,
+            by default False
 
         Returns
         -------
@@ -290,22 +439,29 @@ class NamedEntityRecognizer:
         self.dataset = df_input.sample(
             n=min(data_sample, df_input.shape[0]), random_state=random_state
         )
-        # "string" picks up pandas 3's default str dtype for text columns
-        self.object_columns = list(
-            self.dataset.select_dtypes(["object", "string"]).columns
-        )
+        # "string" picks up pandas 3's default str dtype for text columns. Object
+        # columns of dates or other objects are left out: Presidio rejects them.
+        self.object_columns = [
+            col
+            for col in self.dataset.select_dtypes(["object", "string"]).columns
+            if (columns is None or col in columns)
+            and self.dataset[col].dropna().map(_is_primitive).all()
+        ]
+        self._missing = self.dataset[self.object_columns].isna()
         # fill NaN values for object columns
         self.dataset.loc[:, self.object_columns] = self.dataset.loc[
             :, self.object_columns
         ].fillna(nan_filler)
         self.lang = lang
+        self.offline = offline
 
-        self.presidio_analyzer = None
-        self.model = None
+        self.presidio_analyzer = presidio_analyzer
+        self.model = model
 
         self.dict_global_entities = dict.fromkeys(list(self.dataset.columns))
         self.model_entities = {}
         self.assigned_entities_cols = []
+        self.column_stats = {}
 
     def set_presidio_analyzer(
         self,
@@ -323,53 +479,22 @@ class NamedEntityRecognizer:
             A list in which user can add new address-related words, by default []
         """
 
-        if self.lang == "it":
-            configuration = {
-                "nlp_engine_name": "spacy",
-                "models": [{"lang_code": "it", "model_name": "it_core_news_lg"}],
-            }
-            provider = NlpEngineProvider(nlp_configuration=configuration)
-            nlp_engine_with_italian = provider.create_engine()
-
-            analyzer = AnalyzerEngine(
-                nlp_engine=nlp_engine_with_italian,
-                supported_languages=["it"],
-            )
-
-            if add_addresses_recognizer:
-                addresses_recognizer = it_add_address_entity(additional_addresses)
-                analyzer.registry.add_recognizer(addresses_recognizer)
-
-            self.presidio_analyzer = BatchAnalyzerEngine(analyzer_engine=analyzer)
-
-        else:
-            analyzer = AnalyzerEngine()
-
-            if add_addresses_recognizer:
-                addresses_recognizer = en_add_address_entity(additional_addresses)
-                analyzer.registry.add_recognizer(addresses_recognizer)
-
-            self.presidio_analyzer = BatchAnalyzerEngine(analyzer_engine=analyzer)
+        self.presidio_analyzer = build_presidio_analyzer(
+            "it" if self.lang == "it" else "en",
+            add_addresses_recognizer=add_addresses_recognizer,
+            additional_addresses=additional_addresses,
+            offline=self.offline,
+        )
 
     def set_model(self) -> None:
         """
         Set a pretrained nlp model downloaded from Hugging Face
         (https://huggingface.co/dslim/bert-base-NER) used to recognize ORGANIZATION
         entities.
-
-        Parameters
-        ----------
-        nlp_model : str, optional
-            A NLP model name
         """
-        if self.lang == "it":
-            nlp_model = "osiria/bert-italian-uncased-ner"
-        else:
-            nlp_model = "dslim/bert-base-NER"
-
-        tokenizer = AutoTokenizer.from_pretrained(nlp_model)
-        model = AutoModelForTokenClassification.from_pretrained(nlp_model)
-        self.model = pipeline("ner", model=model, tokenizer=tokenizer)
+        self.model = build_model(
+            "it" if self.lang == "it" else "en", offline=self.offline
+        )
 
     def get_presidio_analyzer_results(self) -> List:
         """
@@ -381,23 +506,18 @@ class NamedEntityRecognizer:
         List
             A list containing the results of the analyzer.
         """
+        if not self.object_columns:
+            return []
         if self.presidio_analyzer is None:
             self.set_presidio_analyzer()
 
-        if self.lang == "it":
-            analyzer_results = list(
-                self.presidio_analyzer.analyze_dict(
-                    self.dataset.to_dict(orient="list"), language="it"
-                )
+        # Only the text columns: the results for the others were never used
+        return list(
+            self.presidio_analyzer.analyze_dict(
+                self.dataset[self.object_columns].to_dict(orient="list"),
+                language="it" if self.lang == "it" else "en",
             )
-            return analyzer_results
-        else:
-            analyzer_results = list(
-                self.presidio_analyzer.analyze_dict(
-                    self.dataset.to_dict(orient="list"), language="en"
-                )
-            )
-            return analyzer_results
+        )
 
     def assign_presidio_entities_list(self) -> None:
         """
@@ -408,6 +528,9 @@ class NamedEntityRecognizer:
         for col in analyzer_results:
             col_name = col.key
             if col_name in self.object_columns:
+                self.column_stats[col_name] = self._presidio_stats(
+                    col_name, col.recognizer_results
+                )
                 # Get the list of entities for each record in the column
                 # Keep the highest-scoring entity found in each value
                 entities_list = [
@@ -421,6 +544,27 @@ class NamedEntityRecognizer:
                     self.dict_global_entities[col_name] = entities_list
                     if col_name not in self.assigned_entities_cols:
                         self.assigned_entities_cols.append(col_name)
+
+    def _presidio_stats(self, col: str, recognizer_results: List) -> Dict:
+        entity_values: Dict[str, int] = {}
+        top_entity_values: Dict[str, int] = {}
+        n_detected = 0
+        for missing, value_results in zip(
+            self._missing[col], recognizer_results, strict=True
+        ):
+            if missing or not value_results:
+                continue
+            n_detected += 1
+            for entity in {result.entity_type for result in value_results}:
+                entity_values[entity] = entity_values.get(entity, 0) + 1
+            top = max(value_results, key=lambda result: result.score).entity_type
+            top_entity_values[top] = top_entity_values.get(top, 0) + 1
+        return {
+            "n_values": int((~self._missing[col]).sum()),
+            "n_detected": n_detected,
+            "entity_values": entity_values,
+            "top_entity_values": top_entity_values,
+        }
 
     def assign_location_entity(self) -> None:
         """
@@ -459,20 +603,41 @@ class NamedEntityRecognizer:
                     "confidence_score": frequency(entities_list, most_freq),
                 }
 
-    def assign_model_entities_list(self) -> None:
+    def assign_model_entities_list(self, skip_columns: Sequence[str] = ()) -> None:
         """
         Assign entities to each object column which didn't get an entity from the
         Presidio Analyzer using the NLP model.
+
+        The model reads each distinct value once.
+
+        Parameters
+        ----------
+        skip_columns : Sequence[str], optional
+            Columns not to pass to the model, e.g. long free text, by default ()
         """
+        columns = [
+            col
+            for col in self.object_columns
+            if self.dict_global_entities[col] is None and col not in skip_columns
+        ]
+        if not columns:
+            return
         if self.model is None:
             self.set_model()
 
-        for col in self.object_columns:
-            if self.dict_global_entities[col] is None:
-                self.model_entities[col] = [
-                    [token["entity"] for token in tokens]
-                    for tokens in self.model(self.dataset[col].tolist())
-                ]
+        for col in columns:
+            values = self.dataset[col].astype(str).tolist()
+            distinct = list(dict.fromkeys(values))
+            labels = {
+                value: [token["entity"] for token in tokens]
+                for value, tokens in zip(distinct, self.model(distinct), strict=True)
+            }
+            self.model_entities[col] = [labels[value] for value in values]
+            self.column_stats.setdefault(col, {})["organization_values"] = sum(
+                has_organization(labels[value])
+                for value, missing in zip(values, self._missing[col], strict=True)
+                if not missing
+            )
 
     def assign_organization_entity(self) -> None:
         """
@@ -531,10 +696,17 @@ class NamedEntityRecognizer:
         self.assign_location_entity()
         self.assign_entities_and_score()
 
-    def assign_organization_entity_with_model(self) -> None:
+    def assign_organization_entity_with_model(
+        self, skip_columns: Sequence[str] = ()
+    ) -> None:
         """
         Assign the ORGANIZATION entity with a confidence score to each object column
         of the dataset using the NLP model.
+
+        Parameters
+        ----------
+        skip_columns : Sequence[str], optional
+            Columns not to pass to the model, e.g. long free text, by default ()
         """
-        self.assign_model_entities_list()
+        self.assign_model_entities_list(skip_columns)
         self.assign_organization_entity()

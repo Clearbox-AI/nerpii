@@ -66,6 +66,24 @@ This dictionary can be accessed using
 recognizer.dict_global_entities
 ```
 
+`recognizer.column_stats` says, for each analyzed column, how many sampled values are not missing (`n_values`), how many have any Presidio detection (`n_detected`) and how many contain each entity (`entity_values`) or have it as their highest-scoring one (`top_entity_values`), plus, after the NLP model ran, how many contain an organization (`organization_values`). Unlike the confidence score, these leave missing values out.
+
+Only text columns are analyzed: object or string columns whose values are strings, numbers or booleans (dates and other objects are left out). Pass `columns` to analyze only some of them. Address words (Street, Via, ...) are matched with their case, so "given via IV" is not an address.
+
+#### Sharing the models and running offline
+
+Loading the spaCy and Hugging Face models takes seconds. To analyze several datasets, build them once and pass them to each recognizer:
+
+```python
+from nerpii.named_entity_recognizer import build_model, build_presidio_analyzer
+
+analyzer = build_presidio_analyzer("en", score_threshold=0.4, offline=True)
+model = build_model("en", offline=True)
+recognizer = NamedEntityRecognizer(df, presidio_analyzer=analyzer, model=model)
+```
+
+With `offline=True` (also a `NamedEntityRecognizer` argument) nothing is downloaded: a missing spaCy model or Hugging Face model raises `ModelUnavailable`, whose message says how to install it. `score_threshold` drops Presidio detections scoring below it. `assign_organization_entity_with_model(skip_columns=[...])` keeps columns such as long free text away from the NLP model, which reads each distinct value once, in batches.
+
 ### PII generation 
 
 After performing NER on a dataset, you can generate new PII using Faker. 

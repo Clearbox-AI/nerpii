@@ -1,6 +1,6 @@
 [project]
 name = "nerpii"
-version = "0.3.0"
+version = "0.4.0"
 description = "A python library to perform NER on structured data and generate PII with Faker"
 authors = [{ name = "Clearbox AI", email = "info@clearbox.ai" }]
 license = "GPL-3.0-only"
