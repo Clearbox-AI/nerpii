@@ -1,7 +1,6 @@
 from typing import Any, Dict, List, Optional, Union
 
 import gender_guesser.detector as gender
-import numpy as np
 import pandas as pd
 
 
@@ -12,7 +11,6 @@ from presidio_analyzer import (
     RecognizerRegistry,
 )
 from presidio_analyzer.nlp_engine import NlpEngineProvider
-import spacy
 from transformers import (
     AutoModelForTokenClassification,
     AutoTokenizer,
@@ -220,7 +218,7 @@ def get_gender(df_input: pd.DataFrame) -> pd.DataFrame:
     for column in df_input.columns:
         if ("first" in column.lower()) and ("name" in column.lower()):
             for name in df_input[column]:
-                if name is not np.NaN:
+                if pd.notna(name):
                     first_name_gender.append(detector.get_gender(name))
                 else:
                     first_name_gender.append("Nan value")
@@ -242,12 +240,12 @@ class NamedEntityRecognizer:
     object_columns : List
         A list of the object columns of the dataset.
     presidio_analyzer : BatchAnalyzerEngine
-        A Presidio BatchAnalyzerEngine instance.
+        A Presidio BatchAnalyzerEngine instance, created on first use.
     assigned_entities_cols : List
         A list of the object columns of the dataset for which entities have been
          assigned.
     model : Any
-        A pretrained nlp model downloaded from Hugging Face
+        A pretrained nlp model downloaded from Hugging Face, loaded on first use
     model_entities : Dict
         A dictionary whose keys are object column names and whose values are a list
         containing all the entities assigned to each value by the model
@@ -255,16 +253,6 @@ class NamedEntityRecognizer:
         A dictionary whose keys have the same names of the dataframe columns and values
         are dictionaries in which the entity associated to the column and its confidence
         score are reported.
-    en_spacy_model : Any
-        An english spacy model
-    it_spacy_model : Any
-        An Italian spacy model
-
-
-    Returns
-    -------
-    _type_
-        _description_
     """
 
     original_dataset: pd.DataFrame
@@ -276,8 +264,6 @@ class NamedEntityRecognizer:
     model_entities: Dict
     dict_global_entities: Dict
     lang: str
-    en_spacy_model: Any
-    it_spacy_model: Any
 
     def __init__(
         self,
@@ -286,9 +272,13 @@ class NamedEntityRecognizer:
         nan_filler: str = "?",
         lang: Optional[str] = "en",
         get_gender_option: Optional[bool] = False,
+        random_state: Optional[int] = None,
     ) -> "NamedEntityRecognizer":
         """
         Create a NamedEntityRecognizer instance.
+
+        The Presidio analyzer and the Hugging Face model are loaded the first time
+        they are needed. Presidio downloads its spaCy model if it is not installed.
 
         Parameters
         ----------
@@ -299,7 +289,13 @@ class NamedEntityRecognizer:
         nan_filler : str, optional
             A string to fill the NaN values for object columns, by default "?"
         lang : str, optional
-            Input language by default "en". Set this parameter to "it" to return better performance on Italian data.
+            Input language by default "en". Set this parameter to "it" to return
+            better performance on Italian data.
+        get_gender_option : Optional[bool], optional
+            Whether to add a first_name_gender column guessed from first name columns,
+            by default False
+        random_state : Optional[int], optional
+            Seed for sampling the rows, by default None
 
         Returns
         -------
@@ -313,8 +309,13 @@ class NamedEntityRecognizer:
         if get_gender_option == True:
             df_input = get_gender(df_input)
 
-        self.dataset = df_input.sample(n=min(data_sample, df_input.shape[0]))
-        self.object_columns = list(self.dataset.select_dtypes(["object"]).columns)
+        self.dataset = df_input.sample(
+            n=min(data_sample, df_input.shape[0]), random_state=random_state
+        )
+        # "string" picks up pandas 3's default str dtype for text columns
+        self.object_columns = list(
+            self.dataset.select_dtypes(["object", "string"]).columns
+        )
         # fill NaN values for object columns
         self.dataset.loc[:, self.object_columns] = self.dataset.loc[
             :, self.object_columns
@@ -327,18 +328,6 @@ class NamedEntityRecognizer:
         self.dict_global_entities = dict.fromkeys(list(self.dataset.columns))
         self.model_entities = {}
         self.assigned_entities_cols = []
-
-        en_spacy_model_name = "en_core_web_lg"
-        it_spacy_model_name = "it_core_news_lg"
-        if self.lang == "en":
-            if not spacy.util.is_package(en_spacy_model_name):
-                spacy.cli.download(en_spacy_model_name)
-            self.en_spacy_model = spacy.load(en_spacy_model_name)
-
-        if self.lang == "it":
-            if not spacy.util.is_package(it_spacy_model_name):
-                spacy.cli.download(it_spacy_model_name)
-            self.it_spacy_model = spacy.load(it_spacy_model_name)
 
     def set_presidio_analyzer(
         self,
@@ -414,6 +403,9 @@ class NamedEntityRecognizer:
         List
             A list containing the results of the analyzer.
         """
+        if self.presidio_analyzer is None:
+            self.set_presidio_analyzer()
+
         if self.lang == "it":
             analyzer_results = list(
                 self.presidio_analyzer.analyze_dict(
@@ -493,6 +485,9 @@ class NamedEntityRecognizer:
         Assign entities to each object column which didn't get an entity from the
         Presidio Analyzer using the NLP model.
         """
+        if self.model is None:
+            self.set_model()
+
         for col in self.object_columns:
             if self.dict_global_entities[col] is None:
                 self.model_entities[col] = self.model(self.dataset[col].tolist())
@@ -556,19 +551,17 @@ class NamedEntityRecognizer:
 
     def assign_entities_with_presidio(self) -> None:
         """
-        Set Presidio Analyzer and assign entities with a confidence score
-        to each object column of the dataset.
+        Assign entities with a confidence score to each object column of the dataset
+        using the Presidio Analyzer.
         """
-        self.set_presidio_analyzer()
         self.assign_presidio_entities_list()
         self.assign_location_entity()
         self.assign_entities_and_score()
 
     def assign_organization_entity_with_model(self) -> None:
         """
-        Set NLP model and assign entities with a confidence score to each
-        object column of the dataset.
+        Assign the ORGANIZATION entity with a confidence score to each object column
+        of the dataset using the NLP model.
         """
-        self.set_model()
         self.assign_model_entities_list()
         self.assign_organization_entity()

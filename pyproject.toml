@@ -10,24 +10,24 @@ repository = "https://github.com/Clearbox-AI/nerpii"
 packages = [{include = "nerpii"}]
 
 [tool.poetry.dependencies]
-python = "^3.9"
-pandas = "^1.5.3"
-presidio-analyzer = "^2.2.32"
-transformers = "^4.26.1"
-faker = "^17.3.0"
+python = "^3.10"
+pandas = ">=2.2,<4"
+numpy = ">=1.26"
+presidio-analyzer = ">=2.2.355,<3"
+transformers = ">=4.40,<6"
+faker = ">=30"
 gender-guesser = "^0.4.0"
-simple-colors = "^0.1.5"
-spacy = ">=3.5.0"
-torch = ">=1.13.1"
+spacy = ">=3.7.2,<4"
+torch = ">=2.2"
 
 
 [tool.poetry.group.dev.dependencies]
-ipykernel = "^6.21.1"
-pytest = "^7.2.1"
-flake8 = "^6.0.0"
+ipykernel = "^6.29"
+pytest = "^8.3"
+flake8 = "^7.1"
 flake8-import-order = "^0.18.2"
 flake8-black = "^0.3.6"
-black = "^23.1.0"
+black = ">=24.8"
 
 [build-system]
 requires = ["poetry-core"]

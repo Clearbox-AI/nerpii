@@ -1,11 +1,35 @@
 import re
-from typing import Any, Dict, List, Union, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
+import unicodedata
 
 from faker import Faker
-
 import numpy as np
 import pandas as pd
-from simple_colors import green, red
+
+GENDER_COLUMN = "first_name_gender"
+
+
+def is_first_name_column(column: str) -> bool:
+    column = column.lower()
+    return "first" in column and "name" in column
+
+
+def is_last_name_column(column: str) -> bool:
+    column = column.lower()
+    return "last" in column and "name" in column
+
+
+def email_local_part(name: Any) -> str:
+    """
+    Reduce a name to lowercase ASCII letters and digits, so that it can be used in
+    an email address ("De Luca" -> "deluca", "Zoë" -> "zoe").
+
+    Returns an empty string if the name is missing or has no usable characters.
+    """
+    if not isinstance(name, str):
+        return ""
+    ascii_name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore")
+    return re.sub(r"[^a-z0-9]", "", ascii_name.decode().lower())
 
 
 class FakerGenerator:
@@ -15,14 +39,14 @@ class FakerGenerator:
     Attributes
     -------
     dataset : pd.DataFrame
-        A pandas dataframe
+        A copy of the input dataframe, in which columns are synthesized
     dict_global_entities : Dict
         A dictionary whose keys have the same names of the dataframe columns and values
         are dictionaries in which the entity associated to the column and its confidence
         score are reported.
     faker : Any
         A generator to obtain synthetisized objects
-    columns_with_assigned_entities : List
+    columns_with_assigned_entity : List
         A list of columns with an assigned entity
     columns_not_synthesized : List
         A list of those columns which are not synthesized by faker
@@ -31,12 +55,8 @@ class FakerGenerator:
     lang : str
         A string to set italian as language of generation. Default: en
     generation_mark : Any
-        A mark for the generation (usually *)
-
-    Returns
-    -------
-    _type_
-        _description_
+        If set, only cells equal to this value (e.g. "*") are synthesized.
+        If None, every non-null cell of a synthesized column is replaced.
     """
 
     dataset: pd.DataFrame
@@ -46,14 +66,14 @@ class FakerGenerator:
     columns_not_synthesized: List
     list_faker: List
     lang: str
-    generation_mark: str
+    generation_mark: Any
 
     def __init__(
         self,
         df_input: Union[str, pd.DataFrame],
         dict_global_entities: Dict,
         lang: str = "en",
-        generation_mark: Optional[str] = None,
+        generation_mark: Optional[Any] = None,
     ) -> "FakerGenerator":
         """
         Create a FakerGenerator instance
@@ -61,13 +81,17 @@ class FakerGenerator:
         Parameters
         ----------
         df_input : Union[str, pd.DataFrame]
-            A pandas dataframe or a path to a csv file.
+            A pandas dataframe or a path to a csv file. The dataframe is copied, so
+            the synthesized data is found in the `dataset` attribute.
         dict_global_entities : Dict
             A dictionary whose keys have the same names of the dataframe columns and
             values are dictionaries in which the entity associated to the column and
             its confidence score are reported.
         lang : str, optional
-            Input language by default "en". Set this parameter to "it" to return better performance on Italian data.
+            Input language by default "en". Set this parameter to "it" to generate
+            Italian data.
+        generation_mark : Optional[Any], optional
+            If set, only cells equal to this value are synthesized, by default None
 
         Returns
         -------
@@ -78,7 +102,7 @@ class FakerGenerator:
         if not isinstance(df_input, pd.DataFrame):
             df_input = pd.read_csv(df_input)
 
-        self.dataset = df_input
+        self.dataset = df_input.copy()
         self.dict_global_entities = dict_global_entities
         self.lang = lang
         if self.lang == "it":
@@ -90,6 +114,42 @@ class FakerGenerator:
         self.list_faker = []
         self.generation_mark = generation_mark
 
+    def _columns_with_entity(
+        self, entity: str, name_filter: Callable[[str], bool] = lambda column: True
+    ) -> List[str]:
+        """
+        Return the columns with the given assigned entity whose name passes the filter.
+        """
+        return [
+            column
+            for column, column_entity in self.columns_with_assigned_entity
+            if column_entity == entity and name_filter(column)
+        ]
+
+    def _synthesize(self, column: str, make_value: Callable[[int], Any]) -> None:
+        """
+        Replace the cells of a column with make_value(row_position).
+
+        If generation_mark is set, only cells equal to it are replaced; otherwise every
+        non-null cell is replaced and missing values are kept.
+        """
+        original = self.dataset[column]
+        if self.generation_mark is None:
+            to_replace = original.notna().to_numpy()
+        else:
+            # Nullable dtypes compare missing values to <NA>, which are not replaced
+            to_replace = (original == self.generation_mark).to_numpy(
+                dtype=bool, na_value=False
+            )
+
+        values = original.to_numpy(dtype=object, copy=True)
+        for position in np.flatnonzero(to_replace):
+            values[position] = make_value(position)
+
+        self.dataset[column] = values
+        if column not in self.list_faker:
+            self.list_faker.append(column)
+
     def get_columns_with_assigned_entity(self) -> None:
         """
         Get a list containing those columns with an assigned entity and confidence
@@ -97,25 +157,27 @@ class FakerGenerator:
 
         """
 
-        if len(self.dict_global_entities) > 0:
-            columns_with_assigned_entity = [
-                [i, self.dict_global_entities[i]["entity"]]
-                for i in self.dict_global_entities
-                if self.dict_global_entities[i] is not None
-                and self.dict_global_entities[i]["confidence_score"] > 0.3
-            ]
-            self.columns_not_synthesized = [
-                [i, self.dict_global_entities[i]["entity"]]
-                for i in self.dict_global_entities
-                if self.dict_global_entities[i] is not None
-                and self.dict_global_entities[i]["confidence_score"] <= 0.3
-                and not re.match(".*?last.*?name.*?", i.lower())
-            ]
+        # Columns without an entity are None, or still a list of entities if the
+        # entities have not been scored yet
+        scored = {
+            column: entity
+            for column, entity in self.dict_global_entities.items()
+            if isinstance(entity, dict)
+        }
+        self.columns_with_assigned_entity = [
+            [column, entity["entity"]]
+            for column, entity in scored.items()
+            if entity["confidence_score"] > 0.3
+        ]
+        self.columns_not_synthesized = [
+            [column, entity["entity"]]
+            for column, entity in scored.items()
+            if entity["confidence_score"] <= 0.3
+            and not re.match(".*?last.*?name.*?", column.lower())
+        ]
 
-        if len(columns_with_assigned_entity) > 0:
-            self.columns_with_assigned_entity = columns_with_assigned_entity
-        else:
-            return print("Impossible to generate Faker data: no assigned entities.")
+        if not self.columns_with_assigned_entity:
+            print("Impossible to generate Faker data: no assigned entities.")
 
     def get_address(self) -> None:
         """
@@ -124,34 +186,15 @@ class FakerGenerator:
         """
 
         addresses = [
-            i[0]
-            for i in self.columns_with_assigned_entity
-            if i[1] == "ADDRESS"
-            or ("indirizzo" in i[0].lower())
-            or (
-                (i[1] == "LOCATION")
-                and (("address" in i[0].lower()) or (("indirizzo" in i[0].lower())))
-            )
+            column
+            for column, entity in self.columns_with_assigned_entity
+            if entity == "ADDRESS"
+            or "indirizzo" in column.lower()
+            or (entity == "LOCATION" and "address" in column.lower())
         ]
 
-        for i in addresses:
-            if self.generation_mark == "*":
-                self.dataset[i] = self.dataset[i].apply(
-                    lambda row: (
-                        self.faker.street_address()
-                        if row == self.generation_mark
-                        else row
-                    )
-                )
-                self.list_faker.append(i)
-            else:
-                self.dataset[i] = self.dataset[i].apply(
-                    lambda row: (
-                        self.faker.street_address() if not pd.isnull(row) else np.NaN
-                    )
-                )
-
-                self.list_faker.append(i)
+        for column in addresses:
+            self._synthesize(column, lambda _: self.faker.street_address())
 
     def get_phone_number(self) -> None:
         """
@@ -159,214 +202,103 @@ class FakerGenerator:
 
         """
 
-        phone_number = [
-            i[0] for i in self.columns_with_assigned_entity if i[1] == "PHONE_NUMBER"
-        ]
+        for column in self._columns_with_entity("PHONE_NUMBER"):
+            self._synthesize(column, lambda _: self.faker.phone_number())
 
-        for i in phone_number:
-            if self.generation_mark == "*":
-                self.dataset[i] = self.dataset[i].apply(
-                    lambda row: (
-                        self.faker.phone_number()
-                        if row == self.generation_mark
-                        else row
-                    )
-                )
-                self.list_faker.append(i)
-            else:
-                self.dataset[i] = self.dataset[i].apply(
-                    lambda row: (
-                        self.faker.phone_number() if not pd.isnull(row) else np.NaN
-                    )
-                )
-
-                self.list_faker.append(i)
-
-    def get_first_name(self) -> None:
+    def _first_name(self, gender: Any) -> str:
         """
-        Synthesize first name columns in a pandas dataframe
-
+        Return a first name matching a gender returned by gender_guesser.
         """
-        first_names = []
-        first_name_person = [
-            i[0]
-            for i in self.columns_with_assigned_entity
-            if i[1] == "PERSON"
-            and (("first" in i[0].lower()) and ("name" in i[0].lower()))
-        ]
+        if gender in ("female", "mostly_female"):
+            return self.faker.first_name_female()
+        if gender in ("male", "mostly_male"):
+            return self.faker.first_name_male()
+        return self.faker.first_name()
 
-        if "first_name_gender" in self.dataset.columns:
-            for i in first_name_person:
-                if self.generation_mark == "*":
-                    for row in range(0, len(self.dataset[i])):
-                        if self.dataset[i][row] == self.generation_mark:
-                            if (
-                                self.dataset["first_name_gender"][row] == "female"
-                                or self.dataset["first_name_gender"][row]
-                                == "mostly_female"
-                            ):
-                                self.dataset[i] = self.dataset[i].apply(
-                                    lambda row: (self.faker.first_name_female())
-                                )
-                            elif (
-                                self.dataset["first_name_gender"][row] == "male"
-                                or self.dataset["first_name_gender"][row]
-                                == "mostly_male"
-                            ):
-                                self.dataset[i] = self.dataset[i].apply(
-                                    lambda row: (self.faker.first_name_male())
-                                )
-                            elif (
-                                self.dataset["first_name_gender"][row] == "unknown"
-                                or self.dataset["first_name_gender"][row] == "andy"
-                            ):
-                                self.dataset[i] = self.dataset[i].apply(
-                                    lambda row: (self.faker.first_name())
-                                )
-                            else:
-                                self.dataset[i][row]
+    def get_first_name(self) -> Optional[List]:
+        """
+        Synthesize first name columns in a pandas dataframe.
 
-                    self.list_faker.append(i)
-                    return list(self.dataset[i])
-                else:
-                    for row in range(0, len(self.dataset[i])):
-                        if not pd.isnull(self.dataset[i][row]):
-                            if (
-                                self.dataset["first_name_gender"][row] == "female"
-                                or self.dataset["first_name_gender"][row]
-                                == "mostly_female"
-                            ):
-                                self.dataset[i] = self.dataset[i].apply(
-                                    lambda row: (self.faker.first_name_female())
-                                )
-                            elif (
-                                self.dataset["first_name_gender"][row] == "male"
-                                or self.dataset["first_name_gender"][row]
-                                == "mostly_male"
-                            ):
-                                self.dataset[i] = self.dataset[i].apply(
-                                    lambda row: (self.faker.first_name_male())
-                                )
-                            elif (
-                                self.dataset["first_name_gender"][row] == "unknown"
-                                or self.dataset["first_name_gender"][row] == "andy"
-                            ):
-                                self.dataset[i] = self.dataset[i].apply(
-                                    lambda row: (self.faker.first_name())
-                                )
-                            else:
-                                self.dataset[i][row] = np.NaN
+        If the dataframe has a first_name_gender column (see get_gender), names are
+        generated with the gender of the original name and the column is dropped.
 
-                    self.list_faker.append(i)
-                    return list(self.dataset[i])
+        Returns
+        -------
+        Optional[List]
+            The values of the first synthesized column, None if there is none.
+        """
+        first_names = self._columns_with_entity("PERSON", is_first_name_column)
 
-            del self.dataset["first_name_gender"]
-
+        if GENDER_COLUMN in self.dataset.columns:
+            genders = self.dataset[GENDER_COLUMN].to_numpy()
+            for column in first_names:
+                self._synthesize(
+                    column, lambda position: self._first_name(genders[position])
+                )
+            self.dataset = self.dataset.drop(columns=GENDER_COLUMN)
         else:
-            for i in first_name_person:
-                self.dataset[i] = self.dataset[i].apply(
-                    lambda row: (
-                        self.faker.first_name() if not pd.isnull(row) else np.NaN
-                    )
-                )
+            for column in first_names:
+                self._synthesize(column, lambda _: self.faker.first_name())
 
-                self.list_faker.append(i)
-            return list(self.dataset[i])
+        return list(self.dataset[first_names[0]]) if first_names else None
 
-    def get_last_name(self) -> None:
+    def get_last_name(self) -> Optional[List]:
         """
         Synthesize last name columns in a pandas dataframe
 
+        Returns
+        -------
+        Optional[List]
+            The values of the first synthesized column, None if there is none.
         """
 
-        last_name_person = [
-            i[0]
-            for i in self.columns_with_assigned_entity
-            if i[1] == "PERSON"
-            and (("last" in i[0].lower()) and ("name" in i[0].lower()))
-        ]
-
-        if len(last_name_person) > 0:
-            for i in last_name_person:
-                if self.generation_mark == "*":
-                    self.dataset[i] = self.dataset[i].apply(
-                        lambda row: (self.faker.last_name() if row == "*" else row)
-                    )
-                    self.list_faker.append(i)
-
-                else:
-                    self.dataset[i] = self.dataset[i].apply(
-                        lambda row: (
-                            self.faker.last_name() if not pd.isnull(row) else np.NaN
-                        )
-                    )
-
-                    self.list_faker.append(i)
-
-                return list(self.dataset[i])
-
-        else:
-            last_name_person = [
-                i
-                for i in self.dataset.columns
-                if (("last" in i.lower()) and ("name" in i.lower()))
+        last_names = self._columns_with_entity("PERSON", is_last_name_column)
+        if not last_names:
+            # Last names are often not recognized as PERSON, so fall back to the
+            # column names
+            last_names = [
+                column for column in self.dataset.columns if is_last_name_column(column)
             ]
-            for i in last_name_person:
-                if self.generation_mark == "*":
-                    self.dataset[i] = self.dataset[i].apply(
-                        lambda row: (self.faker.last_name() if row == "*" else row)
-                    )
-                    self.list_faker.append(i)
-                else:
-                    self.dataset[i] = self.dataset[i].apply(
-                        lambda row: (
-                            self.faker.last_name() if not pd.isnull(row) else np.NaN
-                        )
-                    )
 
-                    self.list_faker.append(i)
+        for column in last_names:
+            self._synthesize(column, lambda _: self.faker.last_name())
 
-                return list(self.dataset[i])
+        return list(self.dataset[last_names[0]]) if last_names else None
 
-    def get_email_address(self, names, last_names) -> None:
+    def _email_address(
+        self, names: Optional[List], last_names: Optional[List], position: int
+    ) -> str:
+        """
+        Return a "name.last_name@domain" email address for a row, or a random email
+        address if the row has no usable name and last name.
+        """
+        name = email_local_part(names[position]) if names is not None else ""
+        last_name = (
+            email_local_part(last_names[position]) if last_names is not None else ""
+        )
+        if name and last_name:
+            return f"{name}.{last_name}@{self.faker.free_email_domain()}"
+        return self.faker.free_email()
+
+    def get_email_address(
+        self, names: Optional[List] = None, last_names: Optional[List] = None
+    ) -> None:
         """
         Synthesize email address columns in a pandas dataframe
+
+        Parameters
+        ----------
+        names : Optional[List], optional
+            First names to build the addresses from, one per row, by default None
+        last_names : Optional[List], optional
+            Last names to build the addresses from, one per row, by default None
         """
 
-        email_address = [
-            i[0] for i in self.columns_with_assigned_entity if i[1] == "EMAIL_ADDRESS"
-        ]
-
-        for i in email_address:
-            if self.generation_mark == "*":
-                self.dataset[i] = self.dataset.apply(
-                    lambda row: (
-                        names[row.name].lower()
-                        + "."
-                        + last_names[row.name].lower()
-                        + "@"
-                        + self.faker.free_email_domain()
-                        if row == self.generation_mark
-                        else row
-                    ),
-                    axis=1,
-                )
-                self.list_faker.append(i)
-            else:
-                self.dataset[i] = self.dataset.apply(
-                    lambda row: (
-                        names[row.name].lower()
-                        + "."
-                        + last_names[row.name].lower()
-                        + "@"
-                        + self.faker.free_email_domain()
-                        if not pd.isnull(row[i])
-                        else row[i]
-                    ),
-                    axis=1,
-                )
-
-                self.list_faker.append(i)
+        for column in self._columns_with_entity("EMAIL_ADDRESS"):
+            self._synthesize(
+                column,
+                lambda position: self._email_address(names, last_names, position),
+            )
 
     def get_city(self) -> None:
         """
@@ -374,75 +306,29 @@ class FakerGenerator:
 
         """
 
-        city = [
-            i[0]
-            for i in self.columns_with_assigned_entity
-            if i[1] == "LOCATION"
-            and (("city" in i[0].lower()) or ("cities" in i[0].lower()))
-        ]
-
-        for i in city:
-            if self.generation_mark == "*":
-                self.dataset[i] = self.dataset[i].apply(
-                    lambda row: (
-                        self.faker.city() if row == self.generation_mark else row
-                    )
-                )
-                self.list_faker.append(i)
-            else:
-                self.dataset[i] = self.dataset[i].apply(
-                    lambda row: (self.faker.city() if not pd.isnull(row) else np.NaN)
-                )
-
-                self.list_faker.append(i)
+        cities = self._columns_with_entity(
+            "LOCATION",
+            lambda column: "city" in column.lower() or "cities" in column.lower(),
+        )
+        for column in cities:
+            self._synthesize(column, lambda _: self.faker.city())
 
     def get_state(self) -> None:
         """
-        Synthesize state columns in a pandas dataframe
+        Synthesize state columns in a pandas dataframe. States are abbreviated if
+        the first value of the column is two characters long.
 
         """
 
-        state = [
-            i[0]
-            for i in self.columns_with_assigned_entity
-            if i[1] == "LOCATION" and ("state" in i[0].lower())
-        ]
-
-        for i in state:
-            if len(self.dataset[i].iloc[0]) == 2:
-                if self.generation_mark == "*":
-                    self.dataset[i] = self.dataset[i].apply(
-                        lambda row: (
-                            self.faker.state_abbr()
-                            if row == self.generation_mark
-                            else row
-                        )
-                    )
-                    self.list_faker.append(i)
-                else:
-                    self.dataset[i] = self.dataset[i].apply(
-                        lambda row: (
-                            self.faker.state_abbr() if not pd.isnull(row) else np.NaN
-                        )
-                    )
-
-                    self.list_faker.append(i)
+        states = self._columns_with_entity(
+            "LOCATION", lambda column: "state" in column.lower()
+        )
+        for column in states:
+            values = self.dataset[column].dropna()
+            if len(values) > 0 and len(str(values.iloc[0])) == 2:
+                self._synthesize(column, lambda _: self.faker.state_abbr())
             else:
-                if self.generation_mark == "*":
-                    self.dataset[i] = self.dataset[i].apply(
-                        lambda row: (
-                            self.faker.state() if row == self.generation_mark else row
-                        )
-                    )
-                    self.list_faker.append(i)
-                else:
-                    self.dataset[i] = self.dataset[i].apply(
-                        lambda row: (
-                            self.faker.state() if not pd.isnull(row) else np.NaN
-                        )
-                    )
-
-                    self.list_faker.append(i)
+                self._synthesize(column, lambda _: self.faker.state())
 
     def get_url(self) -> None:
         """
@@ -450,22 +336,8 @@ class FakerGenerator:
 
         """
 
-        url = [i[0] for i in self.columns_with_assigned_entity if i[1] == "URL"]
-
-        for i in url:
-            if self.generation_mark == "*":
-                self.dataset[i] = self.dataset[i].apply(
-                    lambda row: (
-                        self.faker.url() if row == self.generation_mark else row
-                    )
-                )
-                self.list_faker.append(i)
-            else:
-                self.dataset[i] = self.dataset[i].apply(
-                    lambda row: (self.faker.url() if not pd.isnull(row) else np.NaN)
-                )
-
-                self.list_faker.append(i)
+        for column in self._columns_with_entity("URL"):
+            self._synthesize(column, lambda _: self.faker.url())
 
     def get_zipcode(self) -> None:
         """
@@ -473,44 +345,13 @@ class FakerGenerator:
 
         """
 
-        zipcode = [i[0] for i in self.columns_with_assigned_entity if i[1] == "ZIPCODE"]
-
         if self.lang == "it":
-            for i in zipcode:
-                if self.generation_mark == "*":
-                    self.dataset[i] = self.dataset[i].apply(
-                        lambda row: (
-                            self.faker.postcode()
-                            if row == self.generation_mark
-                            else row
-                        )
-                    )
-                    self.list_faker.append(i)
-                else:
-                    self.dataset[i] = self.dataset[i].apply(
-                        lambda row: (
-                            self.faker.postcode() if not pd.isnull(row) else np.NaN
-                        )
-                    )
-
-                    self.list_faker.append(i)
+            make_zipcode = self.faker.postcode
         else:
-            for i in zipcode:
-                if self.generation_mark == "*":
-                    self.dataset[i] = self.dataset[i].apply(
-                        lambda row: (
-                            self.faker.zipcode() if row == self.generation_mark else row
-                        )
-                    )
-                    self.list_faker.append(i)
-                else:
-                    self.dataset[i] = self.dataset[i].apply(
-                        lambda row: (
-                            self.faker.zipcode() if not pd.isnull(row) else np.NaN
-                        )
-                    )
+            make_zipcode = self.faker.zipcode
 
-                    self.list_faker.append(i)
+        for column in self._columns_with_entity("ZIPCODE"):
+            self._synthesize(column, lambda _: make_zipcode())
 
     def get_credit_card(self) -> None:
         """
@@ -518,32 +359,8 @@ class FakerGenerator:
 
         """
 
-        credit_card = [
-            i[0]
-            for i in self.columns_with_assigned_entity
-            if i[1] == "CREDIT_CARD_NUMBER"
-        ]
-
-        for i in credit_card:
-            if self.generation_mark == "*":
-                self.dataset[i] = self.dataset[i].apply(
-                    lambda row: (
-                        self.faker.credit_card_number()
-                        if row == self.generation_mark
-                        else row
-                    )
-                )
-                self.list_faker.append(i)
-            else:
-                self.dataset[i] = self.dataset[i].apply(
-                    lambda row: (
-                        self.faker.credit_card_number()
-                        if not pd.isnull(row)
-                        else np.NaN
-                    )
-                )
-
-                self.list_faker.append(i)
+        for column in self._columns_with_entity("CREDIT_CARD_NUMBER"):
+            self._synthesize(column, lambda _: self.faker.credit_card_number())
 
     def get_ssn(self) -> None:
         """
@@ -551,22 +368,8 @@ class FakerGenerator:
 
         """
 
-        ssn = [i[0] for i in self.columns_with_assigned_entity if i[1] == "US_SSN"]
-
-        for i in ssn:
-            if self.generation_mark == "*":
-                self.dataset[i] = self.dataset[i].apply(
-                    lambda row: (
-                        self.faker.ssn() if row == self.generation_mark else row
-                    )
-                )
-                self.list_faker.append(i)
-            else:
-                self.dataset[i] = self.dataset[i].apply(
-                    lambda row: (self.faker.ssn() if not pd.isnull(row) else np.NaN)
-                )
-
-                self.list_faker.append(i)
+        for column in self._columns_with_entity("US_SSN"):
+            self._synthesize(column, lambda _: self.faker.ssn())
 
     def get_country(self) -> None:
         """
@@ -574,26 +377,11 @@ class FakerGenerator:
 
         """
 
-        country = [
-            i[0]
-            for i in self.columns_with_assigned_entity
-            if i[1] == "LOCATION" and ("country" in i[0].lower())
-        ]
-
-        for i in country:
-            if self.generation_mark == "*":
-                self.dataset[i] = self.dataset[i].apply(
-                    lambda row: (
-                        self.faker.country() if row == self.generation_mark else row
-                    )
-                )
-                self.list_faker.append(i)
-            else:
-                self.dataset[i] = self.dataset[i].apply(
-                    lambda row: (self.faker.country() if not pd.isnull(row) else np.NaN)
-                )
-
-                self.list_faker.append(i)
+        countries = self._columns_with_entity(
+            "LOCATION", lambda column: "country" in column.lower()
+        )
+        for column in countries:
+            self._synthesize(column, lambda _: self.faker.country())
 
     def get_columns_not_synthesized(self) -> None:
         """
@@ -601,9 +389,12 @@ class FakerGenerator:
 
         """
 
-        for i in self.columns_with_assigned_entity:
-            if i[0] not in self.list_faker:
-                self.columns_not_synthesized.append(i)
+        for column in self.columns_with_assigned_entity:
+            if (
+                column[0] not in self.list_faker
+                and column not in self.columns_not_synthesized
+            ):
+                self.columns_not_synthesized.append(column)
 
     def synthesis_message(self) -> None:
         """
@@ -611,18 +402,20 @@ class FakerGenerator:
 
         """
 
-        for col in self.list_faker:
-            message = "Column " + green(col, "bold") + " synthesized with Faker."
-            print(message)
+        for column in self.list_faker:
+            print(f"Column {column} synthesized with Faker.")
 
-        for col in self.columns_not_synthesized:
-            message = "Column " + red(col[0], "bold") + " not synthesized with Faker."
-            print(message)
+        for column in self.columns_not_synthesized:
+            print(f"Column {column[0]} not synthesized with Faker.")
 
-    def get_faker_generation(self) -> None:
+    def get_faker_generation(self) -> pd.DataFrame:
         """
         Get faker objects for columns in a pandas dataframe
 
+        Returns
+        -------
+        pd.DataFrame
+            The synthesized dataframe, also available as the `dataset` attribute.
         """
         self.get_columns_with_assigned_entity()
         self.get_address()
@@ -641,3 +434,5 @@ class FakerGenerator:
         self.get_columns_not_synthesized()
 
         self.synthesis_message()
+
+        return self.dataset

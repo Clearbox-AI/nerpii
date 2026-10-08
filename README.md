@@ -4,7 +4,7 @@ Nerpii is a Python library developed to perform Named Entity Recognition (NER) o
 NER is performed with [Presidio](https://github.com/microsoft/presidio) and with a [NLP model](https://huggingface.co/dslim/bert-base-NER) available on HuggingFace, while the PII generation is based on [Faker](https://faker.readthedocs.io/en/master/).
 
 ## Installation
-You can install Nerpii by using pip: 
+Nerpii requires Python 3.10 or later. You can install it by using pip:
 
 ```python
 pip install nerpii
@@ -18,9 +18,11 @@ from nerpii.named_entity_recognizer import NamedEntityRecognizer
 You can create a recognizer passing as parameter a path to a csv file or a Pandas Dataframe
 
 ```python
-recognizer = NamedEntityRecognizer('./csv_path.csv', lang)
+recognizer = NamedEntityRecognizer('./csv_path.csv', lang='en')
 ```
-The <strong>lang</strong> parameter is used to define the language of the dataset. The deafult value is <strong>en</strong> (english), but it can be also selelcted <strong>it</strong> (italian).
+The <strong>lang</strong> parameter is used to define the language of the dataset. The default value is <strong>en</strong> (english), but it can also be set to <strong>it</strong> (italian).
+
+NER runs on a random sample of rows (500 by default, set with <strong>data_sample</strong>). Pass <strong>random_state</strong> to get the same sample every time. The Presidio analyzer and the Hugging Face model are loaded the first time they are needed, and are then reused.
 
 Please note that if there are columns in the dataset containing names of people consisting of first and last names (e.g. John Smith), before creating a recognizer, it is necessary to split the name into two different columns called <strong>first_name</strong> and <strong>last_name</strong> using the function `split_name()`.
 
@@ -82,7 +84,14 @@ If you want to generate Italian PII, add ```lang = "it"``` as parameter to the p
 To generate new PII you can run
 
 ```python
-generator.get_faker_generation()
+synthetic_dataset = generator.get_faker_generation()
+```
+The generator works on a copy of the dataset, so the original dataframe is left unchanged. The synthesized dataframe is returned and is also available as `generator.dataset`.
+
+By default every non-null value of a recognized column is replaced. To replace only some values, mark them in the dataset (e.g. with `*`) and pass the mark as `generation_mark`:
+
+```python
+generator = FakerGenerator(dataset, recognizer.dict_global_entities, generation_mark="*")
 ```
 The method above can generate the following PII:
 * address

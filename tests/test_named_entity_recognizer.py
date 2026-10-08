@@ -1,3 +1,5 @@
+from unittest.mock import Mock
+
 import pandas as pd
 from presidio_analyzer import BatchAnalyzerEngine, PatternRecognizer
 import pytest
@@ -210,9 +212,17 @@ def test_assign_presidio_entity_list(instance):
         "state": ["LOCATION", "LOCATION", "LOCATION"],
         "university": None,
         "person": ["PERSON", "PERSON"],
-        "zipcode": None,
+        # Presidio tags 5-digit zipcodes as dates; assign_entities_manually then
+        # assigns ZIPCODE from the column name
+        "zipcode": ["DATE_TIME", "DATE_TIME"],
     }
-    assert instance.assigned_entities_cols == ["email", "city", "state", "person"]
+    assert instance.assigned_entities_cols == [
+        "email",
+        "city",
+        "state",
+        "person",
+        "zipcode",
+    ]
 
 
 def test_assign_location_entity(instance):
@@ -226,7 +236,7 @@ def test_assign_location_entity(instance):
         "state": {"entity": "LOCATION", "confidence_score": 1.0},
         "university": None,
         "person": ["PERSON", "PERSON"],
-        "zipcode": None,
+        "zipcode": ["DATE_TIME", "DATE_TIME"],
     }
 
 
@@ -261,7 +271,7 @@ def test_assign_entities_and_score(instance):
         "state": {"entity": "LOCATION", "confidence_score": 1.0},
         "university": None,
         "person": {"entity": "PERSON", "confidence_score": 1.0},
-        "zipcode": None,
+        "zipcode": {"entity": "DATE_TIME", "confidence_score": 1.0},
     }
 
 
@@ -306,4 +316,48 @@ def test_assign_entities_manually(instance):
         "university": None,
         "person": None,
         "zipcode": {"entity": "ZIPCODE", "confidence_score": 1.0},
+    }
+
+
+def test_init_does_not_load_models(dataset, monkeypatch):
+    def fail(*args, **kwargs):
+        raise AssertionError("model loaded in __init__")
+
+    monkeypatch.setattr("spacy.load", fail)
+    monkeypatch.setattr("spacy.cli.download", fail)
+    monkeypatch.setattr(
+        "nerpii.named_entity_recognizer.AutoModelForTokenClassification"
+        ".from_pretrained",
+        fail,
+    )
+    recognizer = NamedEntityRecognizer(dataset)
+    assert recognizer.presidio_analyzer is None
+    assert recognizer.model is None
+
+
+def test_random_state_makes_sample_reproducible():
+    df = pd.DataFrame({"n": range(100)})
+    first = NamedEntityRecognizer(df, data_sample=10, random_state=0)
+    second = NamedEntityRecognizer(df, data_sample=10, random_state=0)
+    assert list(first.dataset.index) == list(second.dataset.index)
+
+
+def test_presidio_analyzer_is_reused(instance):
+    analyzer = Mock()
+    analyzer.analyze_dict.return_value = []
+    instance.presidio_analyzer = analyzer
+    instance.assign_entities_with_presidio()
+    instance.assign_entities_with_presidio()
+    assert instance.presidio_analyzer is analyzer
+    assert analyzer.analyze_dict.call_count == 2
+
+
+def test_model_is_reused(instance):
+    model = Mock(side_effect=lambda values: [[{"entity": "B-ORG"}] for _ in values])
+    instance.model = model
+    instance.assign_organization_entity_with_model()
+    assert instance.model is model
+    assert instance.dict_global_entities["university"] == {
+        "entity": "ORGANIZATION",
+        "confidence_score": 1.0,
     }
