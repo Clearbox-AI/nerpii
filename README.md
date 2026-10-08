@@ -124,6 +124,8 @@ City, state, zipcode and country are generated together for each row, so they ar
 
 ## Examples
 
-You can find a notebook example in the [notebook](https://github.com/Clearbox-AI/nerpii/tree/main/notebooks) folder. 
+You can find a notebook example in the [notebook](https://github.com/Clearbox-AI/nerpii/tree/main/notebooks) folder.
 
+## License
 
+Nerpii is licensed under the [GNU General Public License v3.0](LICENSE).
