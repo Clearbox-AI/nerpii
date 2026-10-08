@@ -10,10 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
+    - uses: astral-sh/setup-uv@v10.2.0
       with:
-        python-version: '3.12'
-        architecture: x64
-    - run: pip install poetry==2.4.1
-    - run: poetry build
-    - run: poetry publish --username=__token__ --password=${{ secrets.PYPI_TOKEN }}
+        version: "0.12.23"
+        python-version: "3.12"
+    - run: uv build
+    - run: uv publish
+      env:
+        UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}

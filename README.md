@@ -124,6 +124,18 @@ City, state, zipcode and country are generated together for each row, so they ar
 
 ## Examples
 
-You can find a notebook example in the [notebook](https://github.com/Clearbox-AI/nerpii/tree/main/notebooks) folder. 
+You can find a notebook example in the [notebook](https://github.com/Clearbox-AI/nerpii/tree/main/notebooks) folder.
 
+## Development
 
+Nerpii uses [uv](https://docs.astral.sh/uv/) to manage dependencies. To install them and run the checks that CI runs:
+
+```bash
+uv sync
+uv run flake8 nerpii tests
+uv run pytest
+```
+
+## License
+
+Nerpii is licensed under the [GNU General Public License v3.0](LICENSE).
