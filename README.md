@@ -18,9 +18,11 @@ from nerpii.named_entity_recognizer import NamedEntityRecognizer
 You can create a recognizer passing as parameter a path to a csv file or a Pandas Dataframe
 
 ```python
-recognizer = NamedEntityRecognizer('./csv_path.csv', lang)
+recognizer = NamedEntityRecognizer('./csv_path.csv', lang='en')
 ```
-The <strong>lang</strong> parameter is used to define the language of the dataset. The deafult value is <strong>en</strong> (english), but it can be also selelcted <strong>it</strong> (italian).
+The <strong>lang</strong> parameter is used to define the language of the dataset. The default value is <strong>en</strong> (english), but it can also be set to <strong>it</strong> (italian).
+
+NER runs on a random sample of rows (500 by default, set with <strong>data_sample</strong>). Pass <strong>random_state</strong> to get the same sample every time. The Presidio analyzer and the Hugging Face model are loaded the first time they are needed, and are then reused.
 
 Please note that if there are columns in the dataset containing names of people consisting of first and last names (e.g. John Smith), before creating a recognizer, it is necessary to split the name into two different columns called <strong>first_name</strong> and <strong>last_name</strong> using the function `split_name()`.
 
